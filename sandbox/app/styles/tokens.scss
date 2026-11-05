@@ -1,0 +1,53 @@
+// Токены песочницы — светлая тема: `ThemeProvider` приложения держит `.theme-light`. Акценты и тона
+// кнопок — токены темы uikit (`--theme-*-color`, `--dialog-*`); здесь — поверхности, линии, текст и тона
+// блоков песочницы.
+.theme-light {
+  --root-bg: #f4f5f7;
+  --text-primary: #1c2127;
+  --text-secondary: #6b7280;
+  --splitter-bg: #e3e5e8;
+  --panel-bg: #ffffff;
+  --row-bg-hovered: rgba(0, 0, 0, 0.03);
+  --row-bg-open: rgba(45, 114, 210, 0.06);
+  --network-entry-border-hovered: #cfd4da;
+  --chip-active-bg: #e8f0fe;
+  --chip-active-border: rgba(45, 114, 210, 0.45);
+  --chip-active-tx: #215db0;
+  --code-bg: #f6f8fa;
+  --code-tx: #24292f;
+  // дерево JSON — цвета по типу значения, как в инструментах разработчика браузера
+  --json-tree-label: #881391;
+  --json-tree-string: #c41a16;
+  --json-tree-number: #1c00cf;
+  --json-tree-boolean: #0d22aa;
+  --json-tree-null: #808080;
+  --json-tree-punctuation: #6b7280;
+  --json-tree-icon: #9ca3af;
+  --json-tree-icon-hovered: #1c2127;
+  --json-tree-label-hovered-bg: rgba(136, 19, 145, 0.08);
+  --table-head-bg: #f6f7f9;
+  --badge-neutral-bg: #eef0f3;
+  --badge-neutral-tx: #4b5563;
+  --badge-primary-bg: #e8f0fe;
+  --badge-primary-tx: #215db0;
+  --badge-positive-bg: #dafbe1;
+  --badge-positive-tx: #1a7f37;
+  --badge-warning-bg: #fff8c5;
+  --badge-warning-tx: #9a6700;
+  --badge-negative-bg: #ffebe9;
+  --badge-negative-tx: #cf222e;
+  --resync-banner-bg: #ffebe9;
+  --resync-banner-tx: #cf222e;
+}
+
+// раскладка: один отступ экрана — по краям и между карточками; высота шапки дашборда и строки разделов App —
+// одна, их нижние края на одной линии
+:root {
+  --sandbox-gap: 12px;
+  --sandbox-bar-height: 48px;
+}
+
+// тема uikit `classic` — размеры, которые песочница берёт у темы CRM-клиента
+:root {
+  --segment-control_container_height: 30px;
+}

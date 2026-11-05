@@ -1,0 +1,52 @@
+// Окно приложения версии: строка разделов сверху, страница прокручивается под ней.
+.app-frame {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--splitter-bg);
+  border-radius: 8px;
+  background-color: var(--panel-bg);
+
+  &-nav {
+    display: flex;
+    flex: none;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    min-height: calc(var(--sandbox-bar-height) - 1px);
+    padding: 0 10px 0 14px;
+    border-bottom: 1px solid var(--splitter-bg);
+  }
+
+  &-title {
+    margin-right: 12px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  &-link {
+    padding: 4px 10px;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    text-decoration: none;
+
+    &:hover {
+      background-color: var(--row-bg-hovered);
+      color: var(--text-primary);
+    }
+
+    &[aria-current='page'] {
+      background-color: var(--chip-active-bg);
+      color: var(--chip-active-tx);
+    }
+  }
+
+  &-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 16px;
+    overflow: auto;
+  }
+}

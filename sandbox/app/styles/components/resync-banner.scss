@@ -1,0 +1,10 @@
+.resync-banner {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background-color: var(--resync-banner-bg);
+  color: var(--resync-banner-tx);
+}

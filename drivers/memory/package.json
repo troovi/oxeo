@@ -1,0 +1,27 @@
+{
+  "name": "@oxeo-drivers/memory",
+  "version": "0.2.0",
+  "description": "Драйвер @oxeo/server в памяти процесса: для тестов доменов и песочниц",
+  "main": "dist/index.js",
+  "types": "./lib/index.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "echo": "echo \"@oxeo-drivers/memory.\"",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@companix/utils-js": "latest",
+    "@oxeo/scheme": "file:../../core/scheme",
+    "@oxeo/server": "file:../../core/server"
+  },
+  "devDependencies": {
+    "@typescript-eslint/parser": "^5.62.0",
+    "eslint-config-react-app": "^7.0.1",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-react": "^7.34.3",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "typescript": "^5.9.3"
+  }
+}

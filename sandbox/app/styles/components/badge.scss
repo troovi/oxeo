@@ -1,0 +1,17 @@
+.badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+
+  @each $tone in (neutral, primary, positive, warning, negative) {
+    &[data-tone='#{$tone}'] {
+      background-color: var(--badge-#{$tone}-bg);
+      color: var(--badge-#{$tone}-tx);
+    }
+  }
+}

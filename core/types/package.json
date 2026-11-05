@@ -1,0 +1,14 @@
+{
+  "name": "@oxeo/types",
+  "version": "0.2.0",
+  "main": "dist/index.js",
+  "types": "./index.ts",
+  "scripts": {
+    "echo": "echo \"@oxeo/types\"",
+    "build": "rm -rf dist && tsc"
+  },
+  "devDependencies": {
+    "@types/multer": "^2.0.0",
+    "@types/node": "^22.13.9"
+  }
+}

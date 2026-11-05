@@ -1,0 +1,45 @@
+// Поля записи — таблица из двух колонок с разделителем, как таблица записей: имя слева моноширинно, значение
+// справа; поле-ссылка ведёт в связанную запись.
+.record-fields {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--splitter-bg);
+  border-radius: 8px;
+
+  &-row {
+    display: grid;
+    grid-template-columns: 160px minmax(0, 1fr);
+
+    & + & {
+      border-top: 1px solid var(--splitter-bg);
+    }
+  }
+
+  &-name {
+    padding: 5px 8px;
+    border-right: 1px solid var(--splitter-bg);
+    background-color: var(--table-head-bg);
+    color: var(--text-secondary);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+  }
+
+  &-value {
+    margin: 0;
+    padding: 5px 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    word-break: break-all;
+  }
+
+  &-link {
+    color: var(--theme-primary-color);
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}

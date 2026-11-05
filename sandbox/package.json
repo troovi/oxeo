@@ -1,0 +1,43 @@
+{
+  "name": "@oxeo/sandbox",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Песочница oxeo: минимальный сервер NestJS и приложение Vite на uikit для набросков версий библиотеки",
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "server": "tsx watch server/main.ts",
+    "app": "vite --config app/vite.config.ts",
+    "visual": "node scripts/visual.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@companix/formkit": "latest",
+    "@companix/icons-solid": "latest",
+    "@companix/uikit": "latest",
+    "@companix/utils-browser": "latest",
+    "@companix/utils-js": "latest",
+    "@nestjs/common": "^11.1.17",
+    "@nestjs/core": "^11.1.17",
+    "@nestjs/platform-express": "^11.1.17",
+    "classnames": "^2.5.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-json-view-lite": "^2.5.0",
+    "react-router": "^7.18.5",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@oxeo/visual": "file:../tools/visual",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.6.0",
+    "sass": "^1.96.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.0.0"
+  }
+}

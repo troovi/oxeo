@@ -1,0 +1,56 @@
+// Оболочка окна uikit: шапка с заголовком и крестиком, прокручиваемое тело, подвал с кнопками справа.
+.dialog-kit {
+  &-header {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 52px;
+    min-height: 52px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--splitter-bg);
+  }
+
+  &-title {
+    padding-right: 32px;
+    overflow: hidden;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 16px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: inline-flex;
+    padding: 8px;
+    border-radius: 8px;
+    color: var(--dialog-close-color);
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--dialog-close-hover-background);
+    }
+  }
+
+  &-body {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+    padding: 16px;
+    overflow: auto;
+  }
+
+  &-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--splitter-bg);
+  }
+}

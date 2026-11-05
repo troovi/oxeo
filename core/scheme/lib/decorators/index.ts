@@ -1,0 +1,11 @@
+export * from './prop.decorator'
+export * from './model.decorator'
+export * from './identifier.decorator'
+export * from './embedded.decorator'
+export * from './link-embedded.decorator'
+export * from './discriminator.decorator'
+export * from './discriminated-model.decorator'
+// relations
+export * from './relations/model-to-model.decorators'
+export * from './relations/ownership.decorator'
+export * from './relations/references.decorator'

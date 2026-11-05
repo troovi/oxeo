@@ -1,0 +1,187 @@
+@keyframes popoverScaleIn {
+  from {
+    transform: scale(0.3);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+// out
+
+@keyframes popoverScaleOut {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(0.3);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+// Fade-out that starts from the element's current computed opacity (no explicit `from`),
+// so it picks up seamlessly from wherever a drag interaction left the overlay.
+@keyframes drawerOverlayOut {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes checkboxIn {
+  from {
+    transform: translateY(-5px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes checkboxOut {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes checkboxInColor {
+  from {
+    color: transparent;
+  }
+  to {
+    color: #242429;
+  }
+}
+
+@keyframes checkboxOutColor {
+  from {
+    color: #242429;
+  }
+  to {
+    color: transparent;
+  }
+}
+
+// radio-mark
+
+@keyframes markScaleIn {
+  from {
+    transform: scale(0.1);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes markScaleOut {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(0.1);
+  }
+}
+
+// dialog
+
+@keyframes dialogIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes dialogOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+
+// drawer
+
+@keyframes slideFromBottom {
+  from {
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes slideToBottom {
+  to {
+    transform: translate3d(0, 100%, 0);
+  }
+}
+
+@keyframes slideFromTop {
+  from {
+    transform: translate3d(0, -100%, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes slideToTop {
+  to {
+    transform: translate3d(0, -100%, 0);
+  }
+}
+
+@keyframes slideFromLeft {
+  from {
+    transform: translate3d(-100%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes slideToLeft {
+  to {
+    transform: translate3d(-100%, 0, 0);
+  }
+}
+
+@keyframes slideFromRight {
+  from {
+    transform: translate3d(100%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes slideToRight {
+  to {
+    transform: translate3d(100%, 0, 0);
+  }
+}

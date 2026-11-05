@@ -1,0 +1,47 @@
+{
+  "name": "@oxeo-drivers/mongo",
+  "version": "0.2.0",
+  "description": "Драйвер @oxeo/server для MongoDB и модуль NestJS над ним",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "echo": "echo \"@oxeo-drivers/mongo.\"",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "test:unit": "tsc --noEmit && tsx ./tests/unit/definitions.test.ts",
+    "test:unit:map": "tsc --noEmit && tsx ./tests/unit/flatten.test.ts",
+    "test:app": "nest start --watch --builder tsc --path tsconfig.test-app.json --sourceRoot tests/app --entryFile main",
+    "test:custom": "nest start --watch --builder tsc --path tsconfig.test-app.json --sourceRoot tests --entryFile integrations/custom.test",
+    "test:cases": "jest --config ./jest.cases.config.cjs --runInBand"
+  },
+  "devDependencies": {
+    "@oxeo/devkit": "file:../../tools/devkit",
+    "@oxeo-drivers/memory": "file:../memory",
+    "@nestjs/common": "^11.1.17",
+    "@nestjs/core": "^11.1.17",
+    "@nestjs/platform-express": "^11.1.12",
+    "@types/jest": "^30.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "eslint-config-react-app": "^7.0.1",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-react": "^7.34.3",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "jest": "^30.3.0",
+    "mongoose": "9.3.3",
+    "ts-jest": "^29.4.6",
+    "zod": "^4.3.6"
+  },
+  "dependencies": {
+    "@companix/utils-js": "latest",
+    "@oxeo/scheme": "file:../../core/scheme",
+    "@oxeo/server": "file:../../core/server"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^10.0.0 || ^11.0.0",
+    "@nestjs/core": "^10.0.0 || ^11.0.0",
+    "mongoose": "^9.0.0"
+  }
+}

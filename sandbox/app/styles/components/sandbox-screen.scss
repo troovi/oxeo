@@ -1,0 +1,36 @@
+// Экран версии: карточки на фоне с одним отступом — по краям и между блоками. Слева дашборд — шапка и под
+// ней две колонки (операции доменов, Networks), справа — приложение версии; всё во всю высоту окна.
+.sandbox {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--sandbox-gap);
+  height: 100vh;
+  padding: var(--sandbox-gap);
+
+  &-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sandbox-gap);
+    min-height: 0;
+
+    &-panels {
+      display: grid;
+      flex: 1 1 auto;
+      grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+      gap: var(--sandbox-gap);
+      min-height: 0;
+    }
+  }
+
+  &-app {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  &-message {
+    padding: 48px;
+    color: var(--text-secondary);
+    text-align: center;
+  }
+}

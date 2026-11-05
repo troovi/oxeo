@@ -1,0 +1,127 @@
+// Networks: обмен — скруглённая карточка: метод или SSE, адрес, статус, вес и время, ниже превью; раскрытая —
+// подробности внутри той же карточки.
+.network {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+// фильтр — по ширине своих вариантов, а не колонки; вариант в строку
+.network-filter {
+  flex: none;
+  align-self: flex-start;
+  white-space: nowrap;
+}
+
+.network-entry {
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--splitter-bg);
+  border-radius: 8px;
+  background-color: var(--panel-bg);
+  transition: border-color 120ms;
+
+  &:hover {
+    border-color: var(--network-entry-border-hovered);
+  }
+
+  &[data-open] {
+    border-color: var(--chip-active-border);
+  }
+
+  &-head {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    width: 100%;
+    padding: 7px 10px;
+    text-align: left;
+    outline: none;
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--row-bg-hovered);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--theme-primary-color);
+      outline-offset: -2px;
+    }
+  }
+
+  &[data-open] &-head {
+    background-color: var(--row-bg-open);
+  }
+
+  &-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  &-path {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &-meta {
+    flex: none;
+    color: var(--text-secondary);
+    font-size: 12px;
+
+    &[data-failed] {
+      color: var(--badge-negative-tx);
+    }
+  }
+
+  &-time {
+    flex: none;
+    margin-left: auto;
+    color: var(--text-secondary);
+    font-size: 12px;
+  }
+
+  &-preview {
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.network-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--splitter-bg);
+
+  &-title {
+    font-size: 12px;
+    font-weight: 600;
+    word-break: break-all;
+  }
+
+  &-error {
+    color: var(--badge-negative-tx);
+  }
+
+  // вкладки — по ширине своих вариантов, а не колонки; вариант в строку
+  &-tabs {
+    align-self: flex-start;
+    white-space: nowrap;
+  }
+
+  &-empty {
+    color: var(--text-secondary);
+    font-size: 12px;
+  }
+}

@@ -1,0 +1,1171 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Карта схемы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" />
+<style>
+:root { --xv-bg: #f6f6f7; --xv-surface: #ffffff; --xv-surface-2: #f1f1f3; --xv-line: #e4e4e7; --xv-line-strong: #d4d4d8; --xv-text: #18181b; --xv-muted: #63636e; --xv-faint: #a1a1aa; --xv-on-zone: #ffffff; --xv-accent: #2563eb; --xv-accent-quiet: #e0eafd; --xv-match: #f2b200; --xv-code-string: #a1501b; --xv-code-type: #0f7f77; --xv-zone-scheme: #2563eb; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { color-scheme: dark; --xv-bg: #0c0c0e; --xv-surface: #151518; --xv-surface-2: #1f1f23; --xv-line: #2a2a2f; --xv-line-strong: #3a3a41; --xv-text: #f2f2f3; --xv-muted: #a3a3ad; --xv-faint: #6c6c75; --xv-on-zone: #0c0c0e; --xv-accent: #6ea2ff; --xv-accent-quiet: #1a2944; --xv-match: #f4c64a; --xv-code-string: #f0a868; --xv-code-type: #5fd4c4; --xv-zone-scheme: #60a5fa; } }
+:root[data-theme='dark'] { color-scheme: dark; --xv-bg: #0c0c0e; --xv-surface: #151518; --xv-surface-2: #1f1f23; --xv-line: #2a2a2f; --xv-line-strong: #3a3a41; --xv-text: #f2f2f3; --xv-muted: #a3a3ad; --xv-faint: #6c6c75; --xv-on-zone: #0c0c0e; --xv-accent: #6ea2ff; --xv-accent-quiet: #1a2944; --xv-match: #f4c64a; --xv-code-string: #f0a868; --xv-code-type: #5fd4c4; --xv-zone-scheme: #60a5fa; }
+
+.xv-map { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace; }
+.xv-zone-bg { fill: color-mix(in srgb, var(--z) 7%, var(--xv-bg)); stroke: color-mix(in srgb, var(--z) 32%, var(--xv-bg)); stroke-width: 1; }
+.xv-zone-title { font: 600 20px Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: var(--z); letter-spacing: -0.01em; }
+.xv-zone-meta { font: 500 12px Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; fill: var(--xv-muted); letter-spacing: 0; }
+.xv-file-bg { fill: color-mix(in srgb, var(--z) 2%, var(--xv-surface)); stroke: color-mix(in srgb, var(--z) 40%, var(--xv-surface)); stroke-width: 1; stroke-dasharray: 4 3; }
+.xv-file-label { font-size: 11px; font-weight: 600; fill: var(--z); }
+.xv-file-label .ns { font-weight: 400; fill: var(--xv-muted); }
+.xv-edge { color: var(--z); }
+.xv-edge-line { fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linejoin: round; opacity: 0.9; }
+.xv-edge.xv-soft .xv-edge-line { stroke-dasharray: 5 4; }
+.xv-edge.xv-own .xv-edge-line { stroke-width: 2; }
+.xv-edge-end { fill: currentColor; stroke: currentColor; stroke-width: 1.2; stroke-linejoin: round; }
+.xv-edge-end.hollow { fill: var(--xv-surface); }
+.xv-edge-end.open { fill: none; }
+.xv-edge-hit { fill: none; stroke: transparent; stroke-width: 9; }
+.xv-card-bg { fill: var(--xv-surface); stroke: color-mix(in srgb, var(--z) 50%, var(--xv-line)); stroke-width: 1; }
+.xv-card-head { fill: var(--z); }
+.xv-card-title { font-size: 13px; font-weight: 600; fill: var(--xv-on-zone); }
+.xv-card-badge { font-size: 10px; font-weight: 500; fill: var(--xv-on-zone); opacity: 0.85; }
+.xv-row-sep { stroke: color-mix(in srgb, var(--z) 10%, var(--xv-line)); stroke-width: 1; }
+.xv-row-bg { fill: transparent; }
+.xv-row text { font-size: 11px; }
+.xv-row-label { fill: var(--xv-text); }
+.xv-row-label .q { fill: var(--xv-muted); }
+.xv-row-detail { fill: var(--xv-muted); }
+.xv-row-detail.rel { fill: var(--t); font-weight: 500; }
+.xv-row.id .xv-row-label { font-weight: 600; }
+.xv-row.block .xv-row-label, .xv-row.variant .xv-row-label { font-weight: 600; }
+.xv-row.block .xv-row-detail, .xv-row.variant .xv-row-detail { font-style: italic; }
+.xv-block-box { stroke: color-mix(in srgb, var(--z) 45%, var(--xv-line)); stroke-width: 1; }
+.xv-block-rule { stroke: color-mix(in srgb, var(--z) 45%, var(--xv-line)); stroke-width: 1; }
+.xv-row.block .xv-row-label { fill: color-mix(in srgb, var(--z) 70%, var(--xv-text)); }
+.xv-variant-band { fill: color-mix(in srgb, var(--z) 14%, var(--xv-surface)); }
+.xv-card-far { display: none; font-weight: 600; fill: var(--xv-text); dominant-baseline: hanging; font-size: min(var(--fit), calc(13px * var(--xv-inv, 1))); }
+
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--xv-bg); color: var(--xv-text); font: 400 13px/1.45 Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+code { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace; font-size: 0.92em; background: var(--xv-surface-2); padding: 1px 4px; border-radius: 3px; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--xv-accent); outline-offset: 1px; }
+
+.xv-app { position: fixed; inset: 0; }
+.xv-stage { position: absolute; inset: 0; overflow: hidden; background: var(--xv-bg); cursor: grab; touch-action: none; user-select: none; }
+.xv-stage.is-panning { cursor: grabbing; }
+.xv-stage > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* Плавающие подложки поверх карты, как в Miro: карта занимает всё окно */
+.xv-float { position: absolute; top: 12px; z-index: 6; display: flex; align-items: center; gap: 6px; height: 44px; padding: 0 6px; background: var(--xv-surface); border-radius: 8px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--xv-text) 7%, transparent), 0 2px 6px rgb(0 0 0 / 0.06), 0 8px 24px rgb(0 0 0 / 0.07); cursor: auto; user-select: none; }
+.xv-float-left { left: 12px; }
+.xv-float-right { right: 12px; }
+.xv-divider { width: 1px; height: 22px; margin: 0 2px; background: var(--xv-line); flex: none; }
+.xv-meta { padding: 0 8px 0 2px; color: var(--xv-muted); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.xv-ctl-label { padding-left: 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--xv-muted); }
+.xv-seg { display: inline-flex; gap: 2px; padding: 2px; background: var(--xv-surface-2); border-radius: 7px; }
+.xv-seg button { height: 28px; border: 0; background: transparent; color: var(--xv-muted); font-size: 12px; font-weight: 500; line-height: 1; padding: 0 10px; border-radius: 5px; cursor: pointer; }
+.xv-seg button:hover { color: var(--xv-text); }
+.xv-seg button[aria-pressed='true'] { background: var(--xv-surface); color: var(--xv-text); box-shadow: 0 0 0 1px var(--xv-line), 0 1px 2px rgb(0 0 0 / 0.06); }
+.xv-tool { height: 32px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; font-size: 13px; font-weight: 500; cursor: pointer; }
+.xv-tool:hover { background: var(--xv-surface-2); }
+.xv-tool[aria-expanded='true'] { background: var(--xv-accent-quiet); color: var(--xv-accent); }
+.xv-search { position: relative; display: flex; align-items: center; }
+.xv-search-icon { position: absolute; left: 10px; color: var(--xv-faint); pointer-events: none; }
+.xv-search input { width: 260px; height: 32px; padding: 0 40px 0 32px; border: 0; border-radius: 6px; background: var(--xv-surface-2); color: var(--xv-text); font: 13px Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+.xv-search input::placeholder { color: var(--xv-faint); }
+.xv-search-count { position: absolute; right: 10px; font: 500 11px 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace; color: var(--xv-muted); pointer-events: none; }
+.xv-zoom { position: absolute; left: 12px; bottom: 12px; padding: 3px 8px; border-radius: 4px; background: color-mix(in srgb, var(--xv-surface) 88%, transparent); color: var(--xv-muted); font: 500 11px 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace; pointer-events: none; }
+
+.xv-map .xv-card, .xv-map .xv-edge { cursor: pointer; transition: opacity 0.12s; }
+.xv-map .xv-row:hover .xv-row-bg { fill: color-mix(in srgb, var(--xv-accent) 8%, transparent); }
+.xv-map.has-focus .xv-edge:not(.is-on) { opacity: 0.07; }
+.xv-map.has-focus .xv-card:not(.is-on) { opacity: 0.3; }
+.xv-map .xv-edge.is-on .xv-edge-line { stroke-width: 2.4; opacity: 1; }
+.xv-map .xv-edge.xv-own.is-on .xv-edge-line { stroke-width: 3; }
+.xv-map .xv-card.is-selected .xv-card-bg { stroke: var(--xv-accent); stroke-width: 2.5; }
+.xv-map.has-search .xv-card:not(.match) { opacity: 0.25; }
+.xv-map .xv-card.match .xv-card-bg { stroke: var(--xv-match); stroke-width: 3; }
+.xv-map .xv-row.match .xv-row-bg { fill: color-mix(in srgb, var(--xv-match) 35%, transparent); }
+.xv-map.is-locked .xv-card:not(.is-on) { opacity: 0.16; cursor: default; }
+.xv-map.is-locked .xv-card:not(.is-on) .xv-row:hover .xv-row-bg { fill: transparent; }
+.xv-map.is-locked .xv-edge:not(.is-on) { opacity: 0.04; pointer-events: none; }
+.xv-map .xv-row.is-pinned .xv-row-bg { fill: color-mix(in srgb, var(--xv-accent) 24%, transparent); stroke: var(--xv-accent); stroke-width: 1; }
+.xv-map .xv-row.is-pinned .xv-row-label { fill: var(--xv-accent); font-weight: 600; }
+.xv-map .xv-row.is-linked .xv-row-bg { fill: color-mix(in srgb, var(--xv-accent) 12%, transparent); }
+.xv-map .xv-edges[data-layer='nohub'] { visibility: hidden; }
+.xv-map.mode-shortcuts .xv-edges[data-layer='all'] { visibility: hidden; }
+.xv-map.mode-shortcuts .xv-edges[data-layer='nohub'] { visibility: visible; }
+.xv-map.mode-shortcuts .xv-edges[data-layer='all'] .xv-edge.xv-hub.is-on { visibility: visible; }
+.xv-map.lod-far .xv-row, .xv-map.lod-far .xv-card-title, .xv-map.lod-far .xv-card-badge, .xv-map.lod-far .xv-file-label { display: none; }
+.xv-map.lod-far .xv-card-far { display: inline; }
+.xv-map.lod-far .xv-zone-title { font-size: clamp(20px, calc(16px * var(--xv-inv, 1)), 76px); }
+.xv-map.lod-far .xv-zone-meta { font-size: clamp(12px, calc(10px * var(--xv-inv, 1)), 36px); }
+.xv-map.lod-far .xv-edge-line { stroke-width: 2.6; }
+
+.xv-legend { position: absolute; top: 64px; right: 12px; z-index: 5; width: 320px; max-width: calc(100% - 24px); max-height: calc(100% - 76px); overflow: auto; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 16px; background: var(--xv-surface); border: 1px solid var(--xv-line-strong); border-radius: 8px; box-shadow: 0 10px 30px rgb(0 0 0 / 0.12); cursor: auto; user-select: text; }
+.xv-legend section h3 { margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--xv-muted); }
+.lg-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 14px; }
+.lg-close { width: 26px; height: 26px; border: 0; border-radius: 5px; background: none; color: var(--xv-muted); font-size: 18px; line-height: 1; cursor: pointer; }
+.lg-close:hover { background: var(--xv-surface-2); color: var(--xv-text); }
+.quiet { color: var(--xv-muted); font-size: 12px; margin: 0; }
+.zone-dot { width: 8px; height: 8px; border-radius: 2px; background: var(--t); flex: none; }
+.ent-link { padding: 0; border: 0; background: none; color: var(--t, var(--xv-accent)); font: 600 12px 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace; cursor: pointer; }
+.ent-link:hover { text-decoration: underline; }
+.del { display: inline-block; padding: 0 5px; border: 1px solid currentColor; border-radius: 3px; font: 500 10px/16px 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace; color: var(--xv-text); }
+.del.cascade { color: #d62828; }
+.del.set-null, .del.unlink { color: var(--xv-muted); border-style: dashed; }
+.legend { display: flex; flex-direction: column; gap: 6px; }
+.lg { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; align-items: center; font-size: 12px; color: var(--xv-muted); }
+.lg span { color: var(--xv-text); }
+.lg small { display: block; color: var(--xv-muted); font-size: 11px; }
+.zones { display: flex; flex-direction: column; gap: 1px; margin: 0 -6px; }
+.zone-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 5px 6px; border: 0; border-radius: 5px; background: none; text-align: left; cursor: pointer; font-size: 13px; }
+.zone-row:hover { background: var(--xv-surface-2); }
+.zone-row .zone-dot { width: 10px; height: 10px; }
+.keys { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--xv-muted); }
+kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-right: 6px; border: 1px solid var(--xv-line-strong); border-bottom-width: 2px; border-radius: 4px; font: 500 11px/18px 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace; color: var(--xv-text); text-align: center; }
+.foot { font-size: 11px; }
+
+.xv-tip { position: fixed; z-index: 50; max-width: 520px; max-height: calc(100vh - 16px); overflow: hidden; padding: 8px 10px; border: 1px solid var(--xv-line-strong); border-radius: 6px; background: var(--xv-surface); box-shadow: 0 8px 24px rgb(0 0 0 / 0.14); font-size: 12px; line-height: 1.5; pointer-events: none; }
+.xv-tip b { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace; font-weight: 600; }
+.xv-tip .muted { color: var(--xv-muted); }
+.xv-tip .tip-code { margin: 6px 0 2px; padding: 5px 7px; border-radius: 4px; background: var(--xv-surface-2); font: 11px/1.5 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace; color: var(--xv-text); overflow-wrap: anywhere; }
+.xv-tip .tip-dec { color: var(--xv-accent); font-weight: 600; }
+.xv-tip .tip-zone { font-weight: 600; }
+.xv-tip .tip-doc { margin: 6px 0; line-height: 1.5; white-space: pre-line; }
+.xv-tip .tip-meta { color: var(--xv-muted); }
+.xv-tip .tip-impact { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--xv-line); display: flex; flex-direction: column; gap: 3px; }
+.xv-tip code { font-size: 11px; }
+.xv-tip .tip-pre { margin: 6px 0 2px; padding: 7px 9px; border-radius: 4px; background: var(--xv-surface-2); font: 11px/1.5 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', monospace; color: var(--xv-text); white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2; }
+.xv-tip .ts-c { color: var(--xv-muted); font-style: italic; }
+.xv-tip .ts-s { color: var(--xv-code-string); }
+.xv-tip .ts-k { color: var(--xv-accent); }
+.xv-tip .ts-t { color: var(--xv-code-type); }
+
+@media (max-width: 720px) {
+  .xv-float-left { right: 12px; }
+  .xv-float-left .xv-divider, .xv-meta { display: none; }
+  .xv-search, .xv-search input { width: 100%; }
+  .xv-search { flex: 1; }
+  .xv-float-right { top: 64px; }
+  .xv-legend { top: 116px; max-height: calc(100% - 128px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .xv-map .xv-card, .xv-map .xv-edge { transition: none; }
+}
+</style>
+<div class="xv-app">
+  <main class="xv-stage" id="xv-stage" aria-label="Карта схемы">
+<svg xmlns="http://www.w3.org/2000/svg" class="xv-map xv-root" viewBox="0 0 1310 1047" width="1310" height="1047">
+<defs>
+<pattern id="xv-hatch-scheme" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke: var(--xv-zone-scheme); stroke-width: 1.5; stroke-opacity: 0.4"/></pattern>
+</defs>
+<g class="xv-zones">
+<g class="xv-zone" data-zone="scheme" style="--z: var(--xv-zone-scheme)"><rect class="xv-zone-bg" x="40" y="40" width="1230" height="967" rx="14"/><text class="xv-zone-title" x="64" y="78">scheme · v-next<tspan class="xv-zone-meta" dx="12">1 файл · 8 коллекций</tspan></text></g>
+</g>
+<g class="xv-files">
+<g class="xv-file" data-file="scheme.ts" style="--z: var(--xv-zone-scheme)"><rect class="xv-file-bg" x="64" y="120" width="1182" height="863" rx="8"/><text class="xv-file-label" x="94" y="141" data-label="scheme.ts · DictionaryEntities">scheme.ts<tspan class="ns"> · DictionaryEntities</tspan></text></g>
+</g>
+<g class="xv-edges" data-layer="all">
+<g class="xv-edge xv-own" data-id="dictionary.options" data-source="dictionary" data-target="option" data-field="options" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M294,244 L315,244 Q322,244 322,237 L322,231 Q322,224 329,224 L350,224"/><path class="xv-edge-line" d="M305,244 L315,244 Q322,244 322,237 L322,231 Q322,224 329,224 L350,224"/><path class="xv-edge-end" d="M294,244 L299.5,248 L305,244 L299.5,240 Z"/></g>
+<g class="xv-edge xv-set xv-soft" data-id="worker.regionIds" data-source="worker" data-target="option" data-field="regionIds" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M418,422 L443,422 Q450,422 450,415 L450,258"/><path class="xv-edge-line" d="M418,422 L443,422 Q450,422 450,415 L450,267"/><path class="xv-edge-end" d="M450,258 L454.5,267 L445.5,267 Z"/><path class="xv-edge-end open" d="M418,427 L428,422 L418,417 M418,422 L428,422"/></g>
+<g class="xv-edge xv-ref xv-soft" data-id="worker.citizenshipId" data-source="worker" data-target="option" data-field="citizenshipId" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M418,442 L443,442 Q450,442 450,435 L450,258"/><path class="xv-edge-line" d="M418,442 L443,442 Q450,442 450,435 L450,267"/><path class="xv-edge-end hollow" d="M450,258 L454.5,267 L445.5,267 Z"/></g>
+<g class="xv-edge xv-ref" data-id="client.managerId" data-source="client" data-target="worker" data-field="managerId" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M294,721 L299,721 Q304,721 304,716 L304,637.8 Q304,630.8 297,630.8 L262.9,630.8 Q256,630.8 256,623.9 L256,617"/><path class="xv-edge-line" d="M294,721 L299,721 Q304,721 304,716 L304,637.8 Q304,630.8 297,630.8 L258.4,630.8 Q256,630.8 256,628.4 L256,626"/><path class="xv-edge-end" d="M256,617 L260.5,626 L251.5,626 Z"/></g>
+<g class="xv-edge xv-ref" data-id="project.clientId" data-source="project" data-target="client" data-field="clientId" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M94,859 L89,859 Q84,859 84,854 L84,686 Q84,681 89,681 L94,681"/><path class="xv-edge-line" d="M94,859 L89,859 Q84,859 84,854 L84,681.5 Q84,681 84.5,681 L85,681"/><path class="xv-edge-end" d="M94,681 L85,685.5 L85,676.5 Z"/></g>
+<g class="xv-edge xv-set xv-soft" data-id="project.recruiterIds" data-source="project" data-target="worker" data-field="recruiterIds" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M294,899 L303,899 Q310,899 310,892 L310,634.2 Q310,627.2 303,627.2 L261.1,627.2 Q256,627.2 256,622.1 L256,617"/><path class="xv-edge-line" d="M294,899 L303,899 Q310,899 310,892 L310,634.2 Q310,627.2 303,627.2 L256.6,627.2 Q256,627.2 256,626.6 L256,626"/><path class="xv-edge-end" d="M256,617 L260.5,626 L251.5,626 Z"/><path class="xv-edge-end open" d="M294,904 L304,899 L294,894 M294,899 L304,899"/></g>
+<g class="xv-edge xv-ref" data-id="shift.projectId" data-source="shift" data-target="project" data-field="projectId" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M606,224 L588,224 Q581,224 581,231 L581,812 Q581,819 574,819 L294,819"/><path class="xv-edge-line" d="M606,224 L588,224 Q581,224 581,231 L581,812 Q581,819 574,819 L303,819"/><path class="xv-edge-end" d="M294,819 L303,814.5 L303,823.5 Z"/></g>
+<g class="xv-edge xv-own" data-id="shift.participantIds" data-source="shift" data-target="participant" data-field="participantIds" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M902,384 L926,384 Q933,384 933,377 L933,231 Q933,224 940,224 L958,224"/><path class="xv-edge-line" d="M913,384 L926,384 Q933,384 933,377 L933,231 Q933,224 940,224 L958,224"/><path class="xv-edge-end" d="M902,384 L907.5,388 L913,384 L907.5,380 Z"/></g>
+<g class="xv-edge xv-ref" data-id="participant.workerId" data-source="participant" data-target="worker" data-field="workerId" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M958,244 L934,244 Q927,244 927,237 L927,161 Q927,154 920,154 L582,154 Q575,154 575,161 L575,315 Q575,322 568,322 L418,322"/><path class="xv-edge-line" d="M958,244 L934,244 Q927,244 927,237 L927,161 Q927,154 920,154 L582,154 Q575,154 575,161 L575,315 Q575,322 568,322 L427,322"/><path class="xv-edge-end" d="M418,322 L427,317.5 L427,326.5 Z"/></g>
+</g>
+<g class="xv-edges" data-layer="nohub">
+<g class="xv-edge xv-own" data-id="dictionary.options" data-source="dictionary" data-target="option" data-field="options" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M294,244 L315,244 Q322,244 322,237 L322,231 Q322,224 329,224 L350,224"/><path class="xv-edge-line" d="M305,244 L315,244 Q322,244 322,237 L322,231 Q322,224 329,224 L350,224"/><path class="xv-edge-end" d="M294,244 L299.5,248 L305,244 L299.5,240 Z"/></g>
+<g class="xv-edge xv-set xv-soft" data-id="worker.regionIds" data-source="worker" data-target="option" data-field="regionIds" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M418,422 L443,422 Q450,422 450,415 L450,258"/><path class="xv-edge-line" d="M418,422 L443,422 Q450,422 450,415 L450,267"/><path class="xv-edge-end" d="M450,258 L454.5,267 L445.5,267 Z"/><path class="xv-edge-end open" d="M418,427 L428,422 L418,417 M418,422 L428,422"/></g>
+<g class="xv-edge xv-ref xv-soft" data-id="worker.citizenshipId" data-source="worker" data-target="option" data-field="citizenshipId" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M418,442 L443,442 Q450,442 450,435 L450,258"/><path class="xv-edge-line" d="M418,442 L443,442 Q450,442 450,435 L450,267"/><path class="xv-edge-end hollow" d="M450,258 L454.5,267 L445.5,267 Z"/></g>
+<g class="xv-edge xv-ref" data-id="client.managerId" data-source="client" data-target="worker" data-field="managerId" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M294,721 L299,721 Q304,721 304,716 L304,637.8 Q304,630.8 297,630.8 L262.9,630.8 Q256,630.8 256,623.9 L256,617"/><path class="xv-edge-line" d="M294,721 L299,721 Q304,721 304,716 L304,637.8 Q304,630.8 297,630.8 L258.4,630.8 Q256,630.8 256,628.4 L256,626"/><path class="xv-edge-end" d="M256,617 L260.5,626 L251.5,626 Z"/></g>
+<g class="xv-edge xv-ref" data-id="project.clientId" data-source="project" data-target="client" data-field="clientId" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M94,859 L89,859 Q84,859 84,854 L84,686 Q84,681 89,681 L94,681"/><path class="xv-edge-line" d="M94,859 L89,859 Q84,859 84,854 L84,681.5 Q84,681 84.5,681 L85,681"/><path class="xv-edge-end" d="M94,681 L85,685.5 L85,676.5 Z"/></g>
+<g class="xv-edge xv-set xv-soft" data-id="project.recruiterIds" data-source="project" data-target="worker" data-field="recruiterIds" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M294,899 L303,899 Q310,899 310,892 L310,634.2 Q310,627.2 303,627.2 L261.1,627.2 Q256,627.2 256,622.1 L256,617"/><path class="xv-edge-line" d="M294,899 L303,899 Q310,899 310,892 L310,634.2 Q310,627.2 303,627.2 L256.6,627.2 Q256,627.2 256,626.6 L256,626"/><path class="xv-edge-end" d="M256,617 L260.5,626 L251.5,626 Z"/><path class="xv-edge-end open" d="M294,904 L304,899 L294,894 M294,899 L304,899"/></g>
+<g class="xv-edge xv-ref" data-id="shift.projectId" data-source="shift" data-target="project" data-field="projectId" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M606,224 L588,224 Q581,224 581,231 L581,812 Q581,819 574,819 L294,819"/><path class="xv-edge-line" d="M606,224 L588,224 Q581,224 581,231 L581,812 Q581,819 574,819 L303,819"/><path class="xv-edge-end" d="M294,819 L303,814.5 L303,823.5 Z"/></g>
+<g class="xv-edge xv-own" data-id="shift.participantIds" data-source="shift" data-target="participant" data-field="participantIds" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M902,384 L926,384 Q933,384 933,377 L933,231 Q933,224 940,224 L958,224"/><path class="xv-edge-line" d="M913,384 L926,384 Q933,384 933,377 L933,231 Q933,224 940,224 L958,224"/><path class="xv-edge-end" d="M902,384 L907.5,388 L913,384 L907.5,380 Z"/></g>
+<g class="xv-edge xv-ref" data-id="participant.workerId" data-source="participant" data-target="worker" data-field="workerId" style="--z: var(--xv-zone-scheme)"><path class="xv-edge-hit" d="M958,244 L934,244 Q927,244 927,237 L927,161 Q927,154 920,154 L582,154 Q575,154 575,161 L575,315 Q575,322 568,322 L418,322"/><path class="xv-edge-line" d="M958,244 L934,244 Q927,244 927,237 L927,161 Q927,154 920,154 L582,154 Q575,154 575,161 L575,315 Q575,322 568,322 L427,322"/><path class="xv-edge-end" d="M418,322 L427,317.5 L427,326.5 Z"/></g>
+</g>
+<g class="xv-cards">
+<g class="xv-card" data-key="dictionary" transform="translate(94 164)" style="--z: var(--xv-zone-scheme)"><rect class="xv-card-bg" width="200" height="94" rx="6"/><path class="xv-card-head" d="M0,6 Q0,0 6,0 H194 Q200,0 200,6 V30 H0 Z"/><text class="xv-card-title" x="10" y="19.5">dictionary</text>
+<g class="xv-row id" data-path="dictionary"><rect class="xv-row-bg" x="0.5" y="30.5" width="199" height="19"/><text class="xv-row-label" x="10" y="44">dictionary</text><text class="xv-row-detail" x="190" y="44" text-anchor="end">PK · string</text></g>
+<g class="xv-row prop" data-path="name"><line class="xv-row-sep" x1="0" x2="200" y1="50" y2="50"/><rect class="xv-row-bg" x="0.5" y="50.5" width="199" height="19"/><text class="xv-row-label" x="10" y="64">name</text><text class="xv-row-detail" x="190" y="64" text-anchor="end">string</text></g>
+<g class="xv-row own" data-path="options" data-target="option"><line class="xv-row-sep" x1="0" x2="200" y1="70" y2="70"/><rect class="xv-row-bg" x="0.5" y="70.5" width="199" height="19"/><text class="xv-row-label" x="10" y="84">options</text><text class="xv-row-detail rel" x="190" y="84" text-anchor="end" style="--t: var(--xv-zone-scheme)">◆ option[]</text></g>
+<text class="xv-card-far" x="100" y="40" text-anchor="middle" style="--fit: 29.3px">dictionary</text>
+</g>
+<g class="xv-card" data-key="option" transform="translate(350 164)" style="--z: var(--xv-zone-scheme)"><rect class="xv-card-bg" width="200" height="94" rx="6"/><path class="xv-card-head" d="M0,6 Q0,0 6,0 H194 Q200,0 200,6 V30 H0 Z"/><text class="xv-card-title" x="10" y="19.5">option</text>
+<g class="xv-row id" data-path="value"><rect class="xv-row-bg" x="0.5" y="30.5" width="199" height="19"/><text class="xv-row-label" x="10" y="44">value</text><text class="xv-row-detail" x="190" y="44" text-anchor="end">PK · string</text></g>
+<g class="xv-row owner" data-path="dictionary" data-target="dictionary"><line class="xv-row-sep" x1="0" x2="200" y1="50" y2="50"/><rect class="xv-row-bg" x="0.5" y="50.5" width="199" height="19"/><text class="xv-row-label" x="10" y="64">dictionary</text><text class="xv-row-detail rel" x="190" y="64" text-anchor="end" style="--t: var(--xv-zone-scheme)">◆ dictionary</text></g>
+<g class="xv-row prop" data-path="title"><line class="xv-row-sep" x1="0" x2="200" y1="70" y2="70"/><rect class="xv-row-bg" x="0.5" y="70.5" width="199" height="19"/><text class="xv-row-label" x="10" y="84">title</text><text class="xv-row-detail" x="190" y="84" text-anchor="end">string</text></g>
+<text class="xv-card-far" x="100" y="40" text-anchor="middle" style="--fit: 48.9px">option</text>
+</g>
+<g class="xv-card" data-key="worker" transform="translate(94 282)" style="--z: var(--xv-zone-scheme)"><rect class="xv-card-bg" width="324" height="335" rx="6"/><path class="xv-card-head" d="M0,6 Q0,0 6,0 H318 Q324,0 324,6 V30 H0 Z"/><text class="xv-card-title" x="10" y="19.5">worker</text>
+<g class="xv-row id" data-path="workerId"><rect class="xv-row-bg" x="0.5" y="30.5" width="323" height="19"/><text class="xv-row-label" x="10" y="44">workerId</text><text class="xv-row-detail" x="314" y="44" text-anchor="end">PK · number</text></g>
+<g class="xv-row prop" data-path="type"><line class="xv-row-sep" x1="0" x2="324" y1="50" y2="50"/><rect class="xv-row-bg" x="0.5" y="50.5" width="323" height="19"/><text class="xv-row-label" x="10" y="64">type</text><text class="xv-row-detail" x="314" y="64" text-anchor="end">office | revisor</text></g>
+<g class="xv-row prop" data-path="name"><line class="xv-row-sep" x1="0" x2="324" y1="70" y2="70"/><rect class="xv-row-bg" x="0.5" y="70.5" width="323" height="19"/><text class="xv-row-label" x="10" y="84">name</text><text class="xv-row-detail" x="314" y="84" text-anchor="end">string</text></g>
+<g class="xv-row prop" data-path="status"><line class="xv-row-sep" x1="0" x2="324" y1="90" y2="90"/><rect class="xv-row-bg" x="0.5" y="90.5" width="323" height="19"/><text class="xv-row-label" x="10" y="104">status</text><text class="xv-row-detail" x="314" y="104" text-anchor="end">working | fired</text></g>
+<g class="xv-row prop" data-path="createdAt"><line class="xv-row-sep" x1="0" x2="324" y1="110" y2="110"/><rect class="xv-row-bg" x="0.5" y="110.5" width="323" height="19"/><text class="xv-row-label" x="10" y="124">createdAt</text><text class="xv-row-detail" x="314" y="124" text-anchor="end">number</text></g>
+<g class="xv-row set" data-path="regionIds" data-target="option"><line class="xv-row-sep" x1="0" x2="324" y1="130" y2="130"/><rect class="xv-row-bg" x="0.5" y="130.5" width="323" height="19"/><text class="xv-row-label" x="10" y="144">regionIds</text><text class="xv-row-detail rel" x="314" y="144" text-anchor="end" style="--t: var(--xv-zone-scheme)">⇉ option[]</text></g>
+<g class="xv-row ref" data-path="citizenshipId" data-target="option"><line class="xv-row-sep" x1="0" x2="324" y1="150" y2="150"/><rect class="xv-row-bg" x="0.5" y="150.5" width="323" height="19"/><text class="xv-row-label" x="10" y="164">citizenshipId<tspan class="q">?</tspan></text><text class="xv-row-detail rel" x="314" y="164" text-anchor="end" style="--t: var(--xv-zone-scheme)">→ option</text></g>
+<g class="xv-row block" data-path="contacts"><rect class="xv-block-box" x="6.5" y="175.5" width="311" height="65" rx="5" style="fill: color-mix(in srgb, var(--z) 8%, var(--xv-surface))"/><path class="xv-block-head" d="M6.5,195 V180.5 Q6.5,175.5 11.5,175.5 H312.5 Q317.5,175.5 317.5,180.5 V195 Z" style="fill: url(#xv-hatch-scheme)"/><line class="xv-block-rule" x1="6.5" x2="317.5" y1="195" y2="195"/><rect class="xv-row-bg" x="6.5" y="175.5" width="311" height="19"/><text class="xv-row-label" x="14" y="189">contacts</text><text class="xv-row-detail" x="310" y="189" text-anchor="end">Contacts</text></g>
+<g class="xv-row prop" data-path="contacts.phone"><rect class="xv-row-bg" x="6.5" y="195.5" width="311" height="19"/><text class="xv-row-label" x="14" y="209">phone</text><text class="xv-row-detail" x="310" y="209" text-anchor="end">string</text></g>
+<g class="xv-row prop" data-path="contacts.email"><line class="xv-row-sep" x1="6" x2="318" y1="215" y2="215"/><rect class="xv-row-bg" x="6.5" y="215.5" width="311" height="19"/><text class="xv-row-label" x="14" y="229">email</text><text class="xv-row-detail" x="310" y="229" text-anchor="end">string</text></g>
+<g class="xv-row variant" data-path="@office"><rect class="xv-variant-band" x="0.5" y="246.5" width="323" height="19"/><rect class="xv-row-bg" x="0.5" y="246.5" width="323" height="19"/><text class="xv-row-label" x="10" y="260">type = office</text><text class="xv-row-detail" x="314" y="260" text-anchor="end">OfficeProfile</text></g>
+<g class="xv-row prop" data-path="positions"><rect class="xv-row-bg" x="0.5" y="266.5" width="323" height="19"/><text class="xv-row-label" x="10" y="280">positions</text><text class="xv-row-detail" x="314" y="280" text-anchor="end">director | recruiter | manager | …</text></g>
+<g class="xv-row variant" data-path="@revisor"><rect class="xv-variant-band" x="0.5" y="291.5" width="323" height="19"/><rect class="xv-row-bg" x="0.5" y="291.5" width="323" height="19"/><text class="xv-row-label" x="10" y="305">type = revisor</text><text class="xv-row-detail" x="314" y="305" text-anchor="end">RevisorProfile</text></g>
+<g class="xv-row prop" data-path="category"><rect class="xv-row-bg" x="0.5" y="311.5" width="323" height="19"/><text class="xv-row-label" x="10" y="325">category</text><text class="xv-row-detail" x="314" y="325" text-anchor="end">junior | middle | senior</text></g>
+<text class="xv-card-far" x="162" y="40" text-anchor="middle" style="--fit: 83.3px">worker</text>
+</g>
+<g class="xv-card" data-key="client" transform="translate(94 641)" style="--z: var(--xv-zone-scheme)"><rect class="xv-card-bg" width="200" height="114" rx="6"/><path class="xv-card-head" d="M0,6 Q0,0 6,0 H194 Q200,0 200,6 V30 H0 Z"/><text class="xv-card-title" x="10" y="19.5">client</text>
+<g class="xv-row id" data-path="clientId"><rect class="xv-row-bg" x="0.5" y="30.5" width="199" height="19"/><text class="xv-row-label" x="10" y="44">clientId</text><text class="xv-row-detail" x="190" y="44" text-anchor="end">PK · number</text></g>
+<g class="xv-row prop" data-path="name"><line class="xv-row-sep" x1="0" x2="200" y1="50" y2="50"/><rect class="xv-row-bg" x="0.5" y="50.5" width="199" height="19"/><text class="xv-row-label" x="10" y="64">name</text><text class="xv-row-detail" x="190" y="64" text-anchor="end">string</text></g>
+<g class="xv-row ref" data-path="managerId" data-target="worker"><line class="xv-row-sep" x1="0" x2="200" y1="70" y2="70"/><rect class="xv-row-bg" x="0.5" y="70.5" width="199" height="19"/><text class="xv-row-label" x="10" y="84">managerId</text><text class="xv-row-detail rel" x="190" y="84" text-anchor="end" style="--t: var(--xv-zone-scheme)">→ worker</text></g>
+<g class="xv-row prop" data-path="createdAt"><line class="xv-row-sep" x1="0" x2="200" y1="90" y2="90"/><rect class="xv-row-bg" x="0.5" y="90.5" width="199" height="19"/><text class="xv-row-label" x="10" y="104">createdAt</text><text class="xv-row-detail" x="190" y="104" text-anchor="end">number</text></g>
+<text class="xv-card-far" x="100" y="40" text-anchor="middle" style="--fit: 48.9px">client</text>
+</g>
+<g class="xv-card" data-key="project" transform="translate(94 779)" style="--z: var(--xv-zone-scheme)"><rect class="xv-card-bg" width="200" height="174" rx="6"/><path class="xv-card-head" d="M0,6 Q0,0 6,0 H194 Q200,0 200,6 V30 H0 Z"/><text class="xv-card-title" x="10" y="19.5">project</text>
+<g class="xv-row id" data-path="projectId"><rect class="xv-row-bg" x="0.5" y="30.5" width="199" height="19"/><text class="xv-row-label" x="10" y="44">projectId</text><text class="xv-row-detail" x="190" y="44" text-anchor="end">PK · number</text></g>
+<g class="xv-row prop" data-path="name"><line class="xv-row-sep" x1="0" x2="200" y1="50" y2="50"/><rect class="xv-row-bg" x="0.5" y="50.5" width="199" height="19"/><text class="xv-row-label" x="10" y="64">name</text><text class="xv-row-detail" x="190" y="64" text-anchor="end">string</text></g>
+<g class="xv-row ref" data-path="clientId" data-target="client"><line class="xv-row-sep" x1="0" x2="200" y1="70" y2="70"/><rect class="xv-row-bg" x="0.5" y="70.5" width="199" height="19"/><text class="xv-row-label" x="10" y="84">clientId</text><text class="xv-row-detail rel" x="190" y="84" text-anchor="end" style="--t: var(--xv-zone-scheme)">→ client</text></g>
+<g class="xv-row prop" data-path="stage"><line class="xv-row-sep" x1="0" x2="200" y1="90" y2="90"/><rect class="xv-row-bg" x="0.5" y="90.5" width="199" height="19"/><text class="xv-row-label" x="10" y="104">stage</text><text class="xv-row-detail" x="190" y="104" text-anchor="end">active | completed</text></g>
+<g class="xv-row set" data-path="recruiterIds" data-target="worker"><line class="xv-row-sep" x1="0" x2="200" y1="110" y2="110"/><rect class="xv-row-bg" x="0.5" y="110.5" width="199" height="19"/><text class="xv-row-label" x="10" y="124">recruiterIds</text><text class="xv-row-detail rel" x="190" y="124" text-anchor="end" style="--t: var(--xv-zone-scheme)">⇉ worker[]</text></g>
+<g class="xv-row prop" data-path="createdAt"><line class="xv-row-sep" x1="0" x2="200" y1="130" y2="130"/><rect class="xv-row-bg" x="0.5" y="130.5" width="199" height="19"/><text class="xv-row-label" x="10" y="144">createdAt</text><text class="xv-row-detail" x="190" y="144" text-anchor="end">number</text></g>
+<g class="xv-row prop" data-path="completedAt"><line class="xv-row-sep" x1="0" x2="200" y1="150" y2="150"/><rect class="xv-row-bg" x="0.5" y="150.5" width="199" height="19"/><text class="xv-row-label" x="10" y="164">completedAt<tspan class="q">?</tspan></text><text class="xv-row-detail" x="190" y="164" text-anchor="end">number</text></g>
+<text class="xv-card-far" x="100" y="40" text-anchor="middle" style="--fit: 41.9px">project</text>
+</g>
+<g class="xv-card" data-key="shift" transform="translate(606 164)" style="--z: var(--xv-zone-scheme)"><rect class="xv-card-bg" width="296" height="305" rx="6"/><path class="xv-card-head" d="M0,6 Q0,0 6,0 H290 Q296,0 296,6 V30 H0 Z"/><text class="xv-card-title" x="10" y="19.5">shift</text>
+<g class="xv-row id" data-path="shiftId"><rect class="xv-row-bg" x="0.5" y="30.5" width="295" height="19"/><text class="xv-row-label" x="10" y="44">shiftId</text><text class="xv-row-detail" x="286" y="44" text-anchor="end">PK · number</text></g>
+<g class="xv-row ref" data-path="projectId" data-target="project"><line class="xv-row-sep" x1="0" x2="296" y1="50" y2="50"/><rect class="xv-row-bg" x="0.5" y="50.5" width="295" height="19"/><text class="xv-row-label" x="10" y="64">projectId</text><text class="xv-row-detail rel" x="286" y="64" text-anchor="end" style="--t: var(--xv-zone-scheme)">→ project</text></g>
+<g class="xv-row prop" data-path="date"><line class="xv-row-sep" x1="0" x2="296" y1="70" y2="70"/><rect class="xv-row-bg" x="0.5" y="70.5" width="295" height="19"/><text class="xv-row-label" x="10" y="84">date</text><text class="xv-row-detail" x="286" y="84" text-anchor="end">string</text></g>
+<g class="xv-row prop" data-path="stage"><line class="xv-row-sep" x1="0" x2="296" y1="90" y2="90"/><rect class="xv-row-bg" x="0.5" y="90.5" width="295" height="19"/><text class="xv-row-label" x="10" y="104">stage</text><text class="xv-row-detail" x="286" y="104" text-anchor="end">created | recruiting | completed …</text></g>
+<g class="xv-row prop" data-path="plan"><line class="xv-row-sep" x1="0" x2="296" y1="110" y2="110"/><rect class="xv-row-bg" x="0.5" y="110.5" width="295" height="19"/><text class="xv-row-label" x="10" y="124">plan</text><text class="xv-row-detail" x="286" y="124" text-anchor="end">number</text></g>
+<g class="xv-row prop" data-path="rate"><line class="xv-row-sep" x1="0" x2="296" y1="130" y2="130"/><rect class="xv-row-bg" x="0.5" y="130.5" width="295" height="19"/><text class="xv-row-label" x="10" y="144">rate</text><text class="xv-row-detail" x="286" y="144" text-anchor="end">number</text></g>
+<g class="xv-row prop" data-path="cancelReason"><line class="xv-row-sep" x1="0" x2="296" y1="150" y2="150"/><rect class="xv-row-bg" x="0.5" y="150.5" width="295" height="19"/><text class="xv-row-label" x="10" y="164">cancelReason<tspan class="q">?</tspan></text><text class="xv-row-detail" x="286" y="164" text-anchor="end">string</text></g>
+<g class="xv-row prop" data-path="createdAt"><line class="xv-row-sep" x1="0" x2="296" y1="170" y2="170"/><rect class="xv-row-bg" x="0.5" y="170.5" width="295" height="19"/><text class="xv-row-label" x="10" y="184">createdAt</text><text class="xv-row-detail" x="286" y="184" text-anchor="end">number</text></g>
+<g class="xv-row prop" data-path="completedAt"><line class="xv-row-sep" x1="0" x2="296" y1="190" y2="190"/><rect class="xv-row-bg" x="0.5" y="190.5" width="295" height="19"/><text class="xv-row-label" x="10" y="204">completedAt<tspan class="q">?</tspan></text><text class="xv-row-detail" x="286" y="204" text-anchor="end">number</text></g>
+<g class="xv-row own" data-path="participantIds" data-target="participant"><line class="xv-row-sep" x1="0" x2="296" y1="210" y2="210"/><rect class="xv-row-bg" x="0.5" y="210.5" width="295" height="19"/><text class="xv-row-label" x="10" y="224">participantIds</text><text class="xv-row-detail rel" x="286" y="224" text-anchor="end" style="--t: var(--xv-zone-scheme)">◆ participant[]</text></g>
+<g class="xv-row block" data-path="stats"><rect class="xv-block-box" x="6.5" y="235.5" width="283" height="65" rx="5" style="fill: color-mix(in srgb, var(--z) 8%, var(--xv-surface))"/><path class="xv-block-head" d="M6.5,255 V240.5 Q6.5,235.5 11.5,235.5 H284.5 Q289.5,235.5 289.5,240.5 V255 Z" style="fill: url(#xv-hatch-scheme)"/><line class="xv-block-rule" x1="6.5" x2="289.5" y1="255" y2="255"/><rect class="xv-row-bg" x="6.5" y="235.5" width="283" height="19"/><text class="xv-row-label" x="14" y="249">stats</text><text class="xv-row-detail" x="282" y="249" text-anchor="end">Stats</text></g>
+<g class="xv-row prop" data-path="stats.attended"><rect class="xv-row-bg" x="6.5" y="255.5" width="283" height="19"/><text class="xv-row-label" x="14" y="269">attended<tspan class="q">?</tspan></text><text class="xv-row-detail" x="282" y="269" text-anchor="end">number</text></g>
+<g class="xv-row prop" data-path="stats.total"><line class="xv-row-sep" x1="6" x2="290" y1="275" y2="275"/><rect class="xv-row-bg" x="6.5" y="275.5" width="283" height="19"/><text class="xv-row-label" x="14" y="289">total<tspan class="q">?</tspan></text><text class="xv-row-detail" x="282" y="289" text-anchor="end">number</text></g>
+<text class="xv-card-far" x="148" y="40" text-anchor="middle" style="--fit: 90.7px">shift</text>
+</g>
+<g class="xv-card" data-key="participant" transform="translate(958 164)" style="--z: var(--xv-zone-scheme)"><rect class="xv-card-bg" width="258" height="174" rx="6"/><path class="xv-card-head" d="M0,6 Q0,0 6,0 H252 Q258,0 258,6 V30 H0 Z"/><text class="xv-card-title" x="10" y="19.5">participant</text>
+<g class="xv-row id" data-path="participantId"><rect class="xv-row-bg" x="0.5" y="30.5" width="257" height="19"/><text class="xv-row-label" x="10" y="44">participantId</text><text class="xv-row-detail" x="248" y="44" text-anchor="end">PK · string</text></g>
+<g class="xv-row owner" data-path="shiftId" data-target="shift"><line class="xv-row-sep" x1="0" x2="258" y1="50" y2="50"/><rect class="xv-row-bg" x="0.5" y="50.5" width="257" height="19"/><text class="xv-row-label" x="10" y="64">shiftId</text><text class="xv-row-detail rel" x="248" y="64" text-anchor="end" style="--t: var(--xv-zone-scheme)">◆ shift</text></g>
+<g class="xv-row ref" data-path="workerId" data-target="worker"><line class="xv-row-sep" x1="0" x2="258" y1="70" y2="70"/><rect class="xv-row-bg" x="0.5" y="70.5" width="257" height="19"/><text class="xv-row-label" x="10" y="84">workerId</text><text class="xv-row-detail rel" x="248" y="84" text-anchor="end" style="--t: var(--xv-zone-scheme)">→ worker</text></g>
+<g class="xv-row prop" data-path="role"><line class="xv-row-sep" x1="0" x2="258" y1="90" y2="90"/><rect class="xv-row-bg" x="0.5" y="90.5" width="257" height="19"/><text class="xv-row-label" x="10" y="104">role</text><text class="xv-row-detail" x="248" y="104" text-anchor="end">revisor | manager</text></g>
+<g class="xv-row prop" data-path="attendance"><line class="xv-row-sep" x1="0" x2="258" y1="110" y2="110"/><rect class="xv-row-bg" x="0.5" y="110.5" width="257" height="19"/><text class="xv-row-label" x="10" y="124">attendance<tspan class="q">?</tspan></text><text class="xv-row-detail" x="248" y="124" text-anchor="end">onTime | late | absent</text></g>
+<g class="xv-row prop" data-path="earned"><line class="xv-row-sep" x1="0" x2="258" y1="130" y2="130"/><rect class="xv-row-bg" x="0.5" y="130.5" width="257" height="19"/><text class="xv-row-label" x="10" y="144">earned<tspan class="q">?</tspan></text><text class="xv-row-detail" x="248" y="144" text-anchor="end">number</text></g>
+<g class="xv-row prop" data-path="addedAt"><line class="xv-row-sep" x1="0" x2="258" y1="150" y2="150"/><rect class="xv-row-bg" x="0.5" y="150.5" width="257" height="19"/><text class="xv-row-label" x="10" y="164">addedAt</text><text class="xv-row-detail" x="248" y="164" text-anchor="end">number</text></g>
+<text class="xv-card-far" x="129" y="40" text-anchor="middle" style="--fit: 35.5px">participant</text>
+</g>
+<g class="xv-card" data-key="counter" transform="translate(606 493)" style="--z: var(--xv-zone-scheme)"><rect class="xv-card-bg" width="200" height="74" rx="6"/><path class="xv-card-head" d="M0,6 Q0,0 6,0 H194 Q200,0 200,6 V30 H0 Z"/><text class="xv-card-title" x="10" y="19.5">counter</text>
+<g class="xv-row id" data-path="source"><rect class="xv-row-bg" x="0.5" y="30.5" width="199" height="19"/><text class="xv-row-label" x="10" y="44">source</text><text class="xv-row-detail" x="190" y="44" text-anchor="end">PK · string</text></g>
+<g class="xv-row prop" data-path="seq"><line class="xv-row-sep" x1="0" x2="200" y1="50" y2="50"/><rect class="xv-row-bg" x="0.5" y="50.5" width="199" height="19"/><text class="xv-row-label" x="10" y="64">seq</text><text class="xv-row-detail" x="190" y="64" text-anchor="end">number</text></g>
+<text class="xv-card-far" x="100" y="40" text-anchor="middle" style="--fit: 41.9px">counter</text>
+</g>
+</g>
+</svg>
+    <div class="xv-float xv-float-left">
+      <label class="xv-search">
+        <svg class="xv-search-icon" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 11 L14.5 14.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <input id="xv-search" type="search" autocomplete="off" spellcheck="false" placeholder="Коллекция или поле…" aria-label="Поиск по коллекциям и полям" />
+        <span class="xv-search-count" id="xv-search-count"></span>
+      </label>
+      <span class="xv-divider" aria-hidden="true"></span>
+      <span class="xv-meta">8 коллекций · 9 связей · 1 файл</span>
+    </div>
+    <div class="xv-float xv-float-right">
+      <span class="xv-ctl-label">Хабы</span>
+      <div class="xv-seg">
+        <button type="button" data-hub-mode="lines">Линии</button>
+        <button type="button" data-hub-mode="shortcuts">Ярлыки</button>
+      </div>
+      <span class="xv-divider" aria-hidden="true"></span>
+      <button type="button" class="xv-tool" id="xv-legend-toggle" aria-controls="xv-legend" aria-expanded="false">Легенда</button>
+    </div>
+    <div class="xv-zoom" id="xv-zoom"></div>
+    <aside class="xv-legend" id="xv-legend" aria-label="Легенда" hidden></aside>
+  </main>
+</div>
+<div class="xv-tip" id="xv-tip" hidden></div>
+<pre id="xv-debug" hidden></pre>
+<script id="xv-data" type="application/json">{"generatedAt":"2026-11-05T11:49:17.252Z","zones":[{"id":"scheme","title":"v-next","colorVar":"--xv-zone-scheme"}],"entities":[{"key":"dictionary","model":"Dictionary","file":"scheme.ts","namespace":"DictionaryEntities","order":0,"idKey":"dictionary","idType":"string","doc":"Справочник: ключ из фиксированного перечня `AppKeys.Dictionary`, владеет значениями каскадом.","decorators":["@Model({ name: 'Dictionary' })"],"fields":[{"name":"dictionary","path":"dictionary","kind":"id","type":"string","decorators":["@Identifier({ type: 'string' })"]},{"name":"name","path":"name","kind":"prop","type":"string","tsType":"string","decorators":["@Prop({ type: 'string' })"]},{"name":"options","path":"options","target":"option","decorators":["@Ownership.HasMany(() => Option, (option) => option.dictionary, { cleanupBehavior: 'cascade' })"],"kind":"own","onDelete":"cascade","ownerField":"dictionary"}],"variants":[]},{"key":"option","model":"Option","file":"scheme.ts","namespace":"DictionaryEntities","order":1,"idKey":"value","idType":"string","doc":"Значение справочника, как в CRM: `value` — сгенерированный идентификатор, общий для всех словарей. Удаление снимает значение с записей: из набора ссылка уходит, одиночная ссылка становится `null`.","decorators":["@Model({ name: 'Option' })"],"fields":[{"name":"value","path":"value","kind":"id","type":"string","decorators":["@Identifier({ type: 'string' })"]},{"name":"dictionary","path":"dictionary","target":"dictionary","decorators":["@Ownership.BelongsTo(() => Dictionary, (dictionary) => dictionary.options)"],"doc":"Словарь-владелец значения.","kind":"owner"},{"name":"title","path":"title","kind":"prop","type":"string","tsType":"string","decorators":["@Prop({ type: 'string' })"]}],"variants":[]},{"key":"worker","model":"Worker","file":"scheme.ts","namespace":"WorkerEntities","order":2,"idKey":"workerId","idType":"number","doc":"Сотрудник: офисный с должностями или ревизор с категорией.","decorators":["@DiscriminatedModel({ name: 'Worker', discriminatorKey: 'type' })"],"fields":[{"name":"workerId","path":"workerId","kind":"id","type":"number","decorators":["@Identifier({ type: 'number' })"]},{"name":"type","path":"type","kind":"prop","type":"literal","tsType":"AppKey.WorkerType","decorators":["@Prop({ type: 'literal', values: AppKeys.WorkerType })"],"values":["office","revisor"]},{"name":"name","path":"name","kind":"prop","type":"string","tsType":"string","decorators":["@Prop({ type: 'string' })"]},{"name":"status","path":"status","kind":"prop","type":"literal","tsType":"AppKey.WorkerStatus","decorators":["@Prop({ type: 'literal', values: AppKeys.WorkerStatus })"],"values":["working","fired"]},{"name":"createdAt","path":"createdAt","kind":"prop","type":"number","tsType":"number","decorators":["@Prop({ type: 'number' })"]},{"name":"contacts","path":"contacts","kind":"embedded","type":"Contacts","decorators":["@LinkEmbedded(Contacts)"],"fields":[{"name":"phone","path":"contacts.phone","kind":"prop","type":"string","tsType":"string","decorators":["@Prop({ type: 'string' })"]},{"name":"email","path":"contacts.email","kind":"prop","type":"string","tsType":"string","decorators":["@Prop({ type: 'string' })"]}]},{"name":"regionIds","path":"regionIds","target":"option","decorators":["@ReferenceSet(() => DictionaryEntities.Option)"],"doc":"Регионы работы — значения справочника `regions`; удалённое значение уходит из набора.","kind":"set","onDelete":"unlink"},{"name":"citizenshipId","path":"citizenshipId","target":"option","decorators":["@ReferenceTo(() => DictionaryEntities.Option, { onRefDeleting: 'set-null' })"],"doc":"Гражданство — значение справочника `citizenships`; удаление значения оставляет `null`.","kind":"ref","nullable":true,"onDelete":"set-null"}],"variants":[{"value":"office","model":"OfficeProfile","decorators":["@Discriminator('office')"],"fields":[{"name":"positions","path":"positions","kind":"prop","type":"enum","tsType":"AppKey.Position[]","decorators":["@Prop({ type: 'enum', values: AppKeys.Position })"],"values":["director","recruiter","manager","accountant"]}]},{"value":"revisor","model":"RevisorProfile","decorators":["@Discriminator('revisor')"],"fields":[{"name":"category","path":"category","kind":"prop","type":"literal","tsType":"AppKey.Category","decorators":["@Prop({ type: 'literal', values: AppKeys.Category })"],"values":["junior","middle","senior"]}]}],"discriminatorKey":"type"},{"key":"client","model":"Client","file":"scheme.ts","namespace":"ClientEntities","order":3,"idKey":"clientId","idType":"number","decorators":["@Model({ name: 'Client' })"],"fields":[{"name":"clientId","path":"clientId","kind":"id","type":"number","decorators":["@Identifier({ type: 'number' })"]},{"name":"name","path":"name","kind":"prop","type":"string","tsType":"string","decorators":["@Prop({ type: 'string' })"]},{"name":"managerId","path":"managerId","target":"worker","decorators":["@ReferenceTo(() => WorkerEntities.BaseWorker)"],"doc":"Менеджер клиента — офисный сотрудник; удаление сотрудника с клиентами запрещено.","kind":"ref","nullable":false,"onDelete":"restrict"},{"name":"createdAt","path":"createdAt","kind":"prop","type":"number","tsType":"number","decorators":["@Prop({ type: 'number' })"]}],"variants":[]},{"key":"project","model":"Project","file":"scheme.ts","namespace":"ProjectEntities","order":4,"idKey":"projectId","idType":"number","decorators":["@Model({ name: 'Project' })"],"fields":[{"name":"projectId","path":"projectId","kind":"id","type":"number","decorators":["@Identifier({ type: 'number' })"]},{"name":"name","path":"name","kind":"prop","type":"string","tsType":"string","decorators":["@Prop({ type: 'string' })"]},{"name":"clientId","path":"clientId","target":"client","decorators":["@ReferenceTo(() => ClientEntities.Client)"],"kind":"ref","nullable":false,"onDelete":"restrict"},{"name":"stage","path":"stage","kind":"prop","type":"literal","tsType":"AppKey.ProjectStage","decorators":["@Prop({ type: 'literal', values: AppKeys.ProjectStage })"],"values":["active","completed"]},{"name":"recruiterIds","path":"recruiterIds","target":"worker","decorators":["@ReferenceSet(() => WorkerEntities.BaseWorker)"],"doc":"Кадровики по набору — набор ссылок; удалённый сотрудник из набора исчезает (`unlink`).","kind":"set","onDelete":"unlink"},{"name":"createdAt","path":"createdAt","kind":"prop","type":"number","tsType":"number","decorators":["@Prop({ type: 'number' })"]},{"name":"completedAt","path":"completedAt","kind":"prop","type":"number","tsType":"number | null","decorators":["@Prop({ type: 'number', nullable: true })"],"nullable":true}],"variants":[]},{"key":"shift","model":"Shift","file":"scheme.ts","namespace":"ShiftEntities","order":5,"idKey":"shiftId","idType":"number","doc":"Смена проекта: дата, план и ставка, стадия со штампами, состав — `participantIds`.","decorators":["@Model({ name: 'Shift' })"],"fields":[{"name":"shiftId","path":"shiftId","kind":"id","type":"number","decorators":["@Identifier({ type: 'number' })"]},{"name":"projectId","path":"projectId","target":"project","decorators":["@ReferenceTo(() => ProjectEntities.Project)"],"kind":"ref","nullable":false,"onDelete":"restrict"},{"name":"date","path":"date","kind":"prop","type":"string","tsType":"string","decorators":["@Prop({ type: 'string' })"],"doc":"Дата смены `YYYY-MM-DD`."},{"name":"stage","path":"stage","kind":"prop","type":"literal","tsType":"AppKey.ShiftStage","decorators":["@Prop({ type: 'literal', values: AppKeys.ShiftStage })"],"values":["created","recruiting","completed","canceled"]},{"name":"plan","path":"plan","kind":"prop","type":"number","tsType":"number","decorators":["@Prop({ type: 'number' })"],"doc":"План ревизоров."},{"name":"rate","path":"rate","kind":"prop","type":"number","tsType":"number","decorators":["@Prop({ type: 'number' })"],"doc":"Ставка ревизора за смену, ₽."},{"name":"cancelReason","path":"cancelReason","kind":"prop","type":"string","tsType":"string | null","decorators":["@Prop({ type: 'string', nullable: true })"],"nullable":true},{"name":"createdAt","path":"createdAt","kind":"prop","type":"number","tsType":"number","decorators":["@Prop({ type: 'number' })"]},{"name":"completedAt","path":"completedAt","kind":"prop","type":"number","tsType":"number | null","decorators":["@Prop({ type: 'number', nullable: true })"],"nullable":true},{"name":"stats","path":"stats","kind":"embedded","type":"Stats","decorators":["@LinkEmbedded(Stats)"],"doc":"Итоги завершённой смены; до завершения — `null`.","fields":[{"name":"attended","path":"stats.attended","kind":"prop","type":"number","tsType":"number | null","decorators":["@Prop({ type: 'number', nullable: true })"],"nullable":true},{"name":"total","path":"stats.total","kind":"prop","type":"number","tsType":"number | null","decorators":["@Prop({ type: 'number', nullable: true })"],"nullable":true}]},{"name":"participantIds","path":"participantIds","target":"participant","decorators":["@Ownership.HasMany(() => Participant, (participant) => participant.shiftId, { cleanupBehavior: 'cascade' })"],"kind":"own","onDelete":"cascade","ownerField":"shiftId"}],"variants":[]},{"key":"participant","model":"Participant","file":"scheme.ts","namespace":"ShiftEntities","order":6,"idKey":"participantId","idType":"string","doc":"Человек на смене: отклик, явка и начисление. Удаляется вместе со сменой.","decorators":["@Model({ name: 'Participant' })"],"fields":[{"name":"participantId","path":"participantId","kind":"id","type":"string","decorators":["@Identifier({ type: 'string' })"]},{"name":"shiftId","path":"shiftId","target":"shift","decorators":["@Ownership.BelongsTo(() => Shift, (shift) => shift.participantIds)"],"kind":"owner"},{"name":"workerId","path":"workerId","target":"worker","decorators":["@ReferenceTo(() => WorkerEntities.BaseWorker)"],"kind":"ref","nullable":false,"onDelete":"restrict"},{"name":"role","path":"role","kind":"prop","type":"literal","tsType":"AppKey.Role","decorators":["@Prop({ type: 'literal', values: AppKeys.Role })"],"values":["revisor","manager"]},{"name":"attendance","path":"attendance","kind":"prop","type":"literal","tsType":"AppKey.Attendance | null","decorators":["@Prop({ type: 'literal', values: AppKeys.Attendance, nullable: true })"],"nullable":true,"values":["onTime","late","absent"]},{"name":"earned","path":"earned","kind":"prop","type":"number","tsType":"number | null","decorators":["@Prop({ type: 'number', nullable: true })"],"nullable":true},{"name":"addedAt","path":"addedAt","kind":"prop","type":"number","tsType":"number","decorators":["@Prop({ type: 'number' })"]}],"variants":[]},{"key":"counter","model":"Counter","file":"scheme.ts","order":7,"idKey":"source","idType":"string","doc":"Счётчик числовых идентификаторов: `source` — источник, `seq` — последний выданный номер.","decorators":["@Model({ name: 'Counter' })"],"fields":[{"name":"source","path":"source","kind":"id","type":"string","decorators":["@Identifier({ type: 'string' })"]},{"name":"seq","path":"seq","kind":"prop","type":"number","tsType":"number","decorators":["@Prop({ type: 'number' })"]}],"variants":[]}],"types":{},"relations":[{"id":"dictionary.options","source":"dictionary","target":"option","kind":"own","field":"options","ownerField":"dictionary","onDelete":"cascade","nullable":false},{"id":"worker.regionIds","source":"worker","target":"option","kind":"set","field":"regionIds","onDelete":"unlink","nullable":false},{"id":"worker.citizenshipId","source":"worker","target":"option","kind":"ref","field":"citizenshipId","onDelete":"set-null","nullable":true},{"id":"client.managerId","source":"client","target":"worker","kind":"ref","field":"managerId","onDelete":"restrict","nullable":false},{"id":"project.clientId","source":"project","target":"client","kind":"ref","field":"clientId","onDelete":"restrict","nullable":false},{"id":"project.recruiterIds","source":"project","target":"worker","kind":"set","field":"recruiterIds","onDelete":"unlink","nullable":false},{"id":"shift.projectId","source":"shift","target":"project","kind":"ref","field":"projectId","onDelete":"restrict","nullable":false},{"id":"shift.participantIds","source":"shift","target":"participant","kind":"own","field":"participantIds","ownerField":"shiftId","onDelete":"cascade","nullable":false},{"id":"participant.workerId","source":"participant","target":"worker","kind":"ref","field":"workerId","onDelete":"restrict","nullable":false}],"zoneOf":{"dictionary":"scheme","option":"scheme","worker":"scheme","client":"scheme","project":"scheme","shift":"scheme","participant":"scheme","counter":"scheme"},"hubs":[],"sources":{"option":1,"worker":3,"client":1,"project":1},"size":{"width":1310,"height":1047}}</script>
+<script>"use strict";
+;
+(() => {
+    const DATA = JSON.parse(document.getElementById('xv-data').textContent);
+    const DEBUG = /[?&]debug\b/.test(location.search);
+    const errors = [];
+    window.addEventListener('error', (e) => errors.push(String(e.message)));
+    const $ = (selector, root = document) => root.querySelector(selector);
+    const esc = (value) => String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+    const md = (text) => esc(text).replace(/`([^`]+)`/g, '<code>$1</code>');
+    const plural = (n, forms) => {
+        const m10 = n % 10;
+        const m100 = n % 100;
+        const form = m10 === 1 && m100 !== 11 ? 0 : m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20) ? 1 : 2;
+        return `${n} ${forms[form]}`;
+    };
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const byKey = new Map(DATA.entities.map((e) => [e.key, e]));
+    const zoneById = new Map(DATA.zones.map((z) => [z.id, z]));
+    const hubs = new Set(DATA.hubs);
+    const outgoing = new Map(DATA.entities.map((e) => [e.key, []]));
+    const incoming = new Map(DATA.entities.map((e) => [e.key, []]));
+    for (const r of DATA.relations) {
+        outgoing.get(r.source).push(r);
+        incoming.get(r.target).push(r);
+    }
+    const ownerOf = new Map(DATA.relations.filter((r) => r.kind === 'own').map((r) => [r.target, r]));
+    const zoneColor = (key) => `var(${zoneById.get(DATA.zoneOf[key])?.colorVar ?? '--xv-muted'})`;
+    const relationOfRow = (key, path) => DATA.relations.find((r) => r.source === key && r.field === path) ??
+        DATA.relations.find((r) => r.kind === 'own' && r.target === key && r.ownerField === path);
+    const countFields = (fields) => fields.reduce((n, f) => n + (f.fields ? countFields(f.fields) : 1), 0);
+    const fieldCount = (e) => countFields(e.fields) + e.variants.reduce((n, v) => n + countFields(v.fields), 0);
+    const paths = (e) => {
+        const list = [];
+        const walk = (fields) => fields.forEach((f) => {
+            list.push(f.path.toLowerCase());
+            if (f.fields)
+                walk(f.fields);
+        });
+        walk(e.fields);
+        e.variants.forEach((v) => walk(v.fields));
+        return list;
+    };
+    const haystack = new Map(DATA.entities.map((e) => [e.key, [e.key.toLowerCase(), e.model.toLowerCase(), ...paths(e)]]));
+    const state = {
+        selected: null,
+        hover: null,
+        hoverEdge: null,
+        pin: null,
+        beforePin: null,
+        query: '',
+        hubMode: 'lines'
+    };
+    try {
+        const saved = localStorage.getItem('xv-hub-mode');
+        if (saved === 'lines' || saved === 'shortcuts')
+            state.hubMode = saved;
+    }
+    catch { }
+    const svg = $('.xv-map');
+    const stage = $('#xv-stage');
+    const tip = $('#xv-tip');
+    const search = $('#xv-search');
+    const cardEls = new Map();
+    svg.querySelectorAll('.xv-card').forEach((el) => cardEls.set(el.dataset.key, el));
+    const layer = (name) => svg.querySelector(`.xv-edges[data-layer="${name}"]`);
+    const activeLayer = () => layer(state.hubMode === 'lines' ? 'all' : 'nohub');
+    const view = { x: 0, y: 0, k: 1 };
+    const MIN_K = 0.08;
+    const MAX_K = 2.5;
+    const LOD_K = 0.5;
+    const applyView = () => {
+        const w = stage.clientWidth;
+        const h = stage.clientHeight;
+        svg.setAttribute('viewBox', `${view.x} ${view.y} ${w / view.k} ${h / view.k}`);
+        svg.classList.toggle('lod-far', view.k < LOD_K);
+        svg.style.setProperty('--xv-inv', String(1 / view.k));
+        const zoom = $('#xv-zoom');
+        if (zoom)
+            zoom.textContent = `${Math.round(view.k * 100)}%`;
+    };
+    let animation = 0;
+    const animateTo = (target) => {
+        cancelAnimationFrame(animation);
+        if (reducedMotion) {
+            Object.assign(view, target);
+            return applyView();
+        }
+        const from = { ...view };
+        const started = performance.now();
+        const step = (now) => {
+            const t = Math.min(1, (now - started) / 280);
+            const ease = 1 - Math.pow(1 - t, 3);
+            view.x = from.x + (target.x - from.x) * ease;
+            view.y = from.y + (target.y - from.y) * ease;
+            view.k = from.k + (target.k - from.k) * ease;
+            applyView();
+            if (t < 1)
+                animation = requestAnimationFrame(step);
+        };
+        animation = requestAnimationFrame(step);
+    };
+    const TOP_INSET = 56;
+    const fitBox = (box, padding = 40, maxK = MAX_K) => {
+        const w = stage.clientWidth;
+        const h = stage.clientHeight - TOP_INSET;
+        const k = Math.max(MIN_K, Math.min(maxK, (w - padding * 2) / box.w, (h - padding * 2) / box.h));
+        return { x: box.x + box.w / 2 - w / 2 / k, y: box.y + box.h / 2 - (TOP_INSET + h / 2) / k, k };
+    };
+    const fitAll = (animate = true) => {
+        const target = fitBox({ x: 0, y: 0, w: DATA.size.width, h: DATA.size.height }, 24);
+        if (animate)
+            animateTo(target);
+        else {
+            Object.assign(view, target);
+            applyView();
+        }
+    };
+    const cardBox = (key) => {
+        const el = cardEls.get(key);
+        if (!el)
+            return null;
+        const m = /translate\(([-\d.]+)[ ,]([-\d.]+)\)/.exec(el.getAttribute('transform') || '');
+        const bg = el.querySelector('.xv-card-bg');
+        return {
+            x: Number(m ? m[1] : 0),
+            y: Number(m ? m[2] : 0),
+            w: Number(bg.getAttribute('width')),
+            h: Number(bg.getAttribute('height'))
+        };
+    };
+    const reveal = (key) => {
+        const keys = [key, ...neighbors(key)];
+        const boxes = keys.map(cardBox).filter(Boolean);
+        const x1 = Math.min(...boxes.map((b) => b.x));
+        const y1 = Math.min(...boxes.map((b) => b.y));
+        const x2 = Math.max(...boxes.map((b) => b.x + b.w));
+        const y2 = Math.max(...boxes.map((b) => b.y + b.h));
+        animateTo(fitBox({ x: x1, y: y1, w: x2 - x1, h: y2 - y1 }, 60, 1.1));
+    };
+    const revealZone = (id) => {
+        const zone = svg.querySelector(`.xv-zone[data-zone="${CSS.escape(id)}"] .xv-zone-bg`);
+        if (!zone)
+            return;
+        const n = (name) => Number(zone.getAttribute(name));
+        animateTo(fitBox({ x: n('x'), y: n('y'), w: n('width'), h: n('height') }, 30));
+    };
+    const toMap = (clientX, clientY) => {
+        const rect = stage.getBoundingClientRect();
+        return { x: view.x + (clientX - rect.left) / view.k, y: view.y + (clientY - rect.top) / view.k };
+    };
+    stage.addEventListener('wheel', (e) => {
+        if (e.target.closest('.xv-legend, .xv-float'))
+            return;
+        e.preventDefault();
+        cancelAnimationFrame(animation);
+        const factor = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015));
+        const k = Math.max(MIN_K, Math.min(MAX_K, view.k * factor));
+        const p = toMap(e.clientX, e.clientY);
+        const rect = stage.getBoundingClientRect();
+        view.k = k;
+        view.x = p.x - (e.clientX - rect.left) / k;
+        view.y = p.y - (e.clientY - rect.top) / k;
+        applyView();
+    }, { passive: false });
+    let drag = null;
+    stage.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 || e.target.closest('.xv-legend, .xv-float'))
+            return;
+        drag = { id: e.pointerId, x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false };
+    });
+    window.addEventListener('pointermove', (e) => {
+        if (!drag || e.pointerId !== drag.id)
+            return;
+        const dx = e.clientX - drag.x;
+        const dy = e.clientY - drag.y;
+        if (!drag.moved && Math.hypot(dx, dy) < 4)
+            return;
+        if (!drag.moved) {
+            drag.moved = true;
+            stage.classList.add('is-panning');
+            hideTip();
+        }
+        view.x = drag.vx - dx / view.k;
+        view.y = drag.vy - dy / view.k;
+        applyView();
+    });
+    window.addEventListener('pointerup', (e) => {
+        if (!drag || e.pointerId !== drag.id)
+            return;
+        const moved = drag.moved;
+        drag = null;
+        stage.classList.remove('is-panning');
+        if (moved)
+            return;
+        const target = e.target;
+        const card = target.closest('.xv-card');
+        const edge = target.closest('.xv-edge');
+        const row = target.closest('.xv-row');
+        if (card && row) {
+            togglePin(card.dataset.key, row.dataset.path);
+        }
+        else if (card) {
+            const key = card.dataset.key;
+            select(state.selected === key && !state.pin ? null : key);
+        }
+        else if (edge) {
+            togglePin(edge.dataset.source, edge.dataset.field);
+        }
+        else if (stage.contains(target)) {
+            select(null);
+        }
+    });
+    function neighbors(key) {
+        const keys = new Set();
+        activeLayer()
+            .querySelectorAll('.xv-edge')
+            .forEach((el) => {
+            if (el.dataset.source === key)
+                keys.add(el.dataset.target);
+            if (el.dataset.target === key)
+                keys.add(el.dataset.source);
+        });
+        if (state.hubMode === 'shortcuts') {
+            for (const r of [...outgoing.get(key), ...incoming.get(key)])
+                keys.add(r.source === key ? r.target : r.source);
+        }
+        keys.delete(key);
+        return [...keys];
+    }
+    const relationsOfRow = (key, path) => {
+        const entity = byKey.get(key);
+        if (path.startsWith('@')) {
+            const variant = path.slice(1);
+            return DATA.relations.filter((r) => r.source === key && r.variant === variant);
+        }
+        const inside = (field) => field !== undefined && (field === path || field.startsWith(`${path}.`));
+        const list = DATA.relations.filter((r) => (r.source === key && inside(r.field)) ||
+            (r.kind === 'own' && r.target === key && inside(r.ownerField)));
+        if (entity && path === entity.idKey) {
+            list.push(...DATA.relations.filter((r) => r.target === key && r.kind !== 'own'));
+        }
+        return [...new Set(list)];
+    };
+    const relationEnds = (r) => {
+        if (r.kind === 'own') {
+            return [
+                { key: r.source, path: r.field },
+                { key: r.target, path: r.ownerField ?? byKey.get(r.target).idKey }
+            ];
+        }
+        return [
+            { key: r.source, path: r.field },
+            { key: r.target, path: byKey.get(r.target).idKey }
+        ];
+    };
+    const rowEl = (key, path) => cardEls.get(key)?.querySelector(`.xv-row[data-path="${CSS.escape(path)}"]`);
+    const isPinned = () => Boolean(state.pin || state.selected);
+    const applyFocus = () => {
+        svg
+            .querySelectorAll('.is-on, .is-selected, .is-pinned, .is-linked')
+            .forEach((el) => el.classList.remove('is-on', 'is-selected', 'is-pinned', 'is-linked'));
+        svg.classList.toggle('is-locked', isPinned());
+        if (state.selected)
+            cardEls.get(state.selected)?.classList.add('is-selected');
+        if (state.pin) {
+            const { key, path } = state.pin;
+            svg.classList.add('has-focus');
+            cardEls.get(key)?.classList.add('is-on');
+            rowEl(key, path)?.classList.add('is-pinned');
+            for (const r of relationsOfRow(key, path)) {
+                svg
+                    .querySelectorAll(`.xv-edge[data-id="${CSS.escape(r.id)}"]`)
+                    .forEach((el) => el.classList.add('is-on'));
+                for (const end of relationEnds(r)) {
+                    cardEls.get(end.key)?.classList.add('is-on');
+                    const el = rowEl(end.key, end.path);
+                    if (el && !el.classList.contains('is-pinned'))
+                        el.classList.add('is-linked');
+                }
+            }
+            return;
+        }
+        if (!isPinned() && state.hoverEdge) {
+            svg.classList.add('has-focus');
+            svg
+                .querySelectorAll(`.xv-edge[data-id="${CSS.escape(state.hoverEdge)}"]`)
+                .forEach((el) => {
+                el.classList.add('is-on');
+                cardEls.get(el.dataset.source)?.classList.add('is-on');
+                cardEls.get(el.dataset.target)?.classList.add('is-on');
+            });
+            return;
+        }
+        const key = isPinned() ? state.selected : state.hover;
+        svg.classList.toggle('has-focus', Boolean(key));
+        if (!key)
+            return;
+        cardEls.get(key)?.classList.add('is-on');
+        svg.querySelectorAll('.xv-edge').forEach((el) => {
+            if (el.dataset.source === key || el.dataset.target === key)
+                el.classList.add('is-on');
+        });
+        neighbors(key).forEach((k) => cardEls.get(k)?.classList.add('is-on'));
+    };
+    function togglePin(key, path) {
+        if (state.pin && state.pin.key === key && state.pin.path === path) {
+            const back = state.beforePin;
+            state.pin = null;
+            state.beforePin = null;
+            select(back);
+            return;
+        }
+        if (!state.pin)
+            state.beforePin = state.selected;
+        state.pin = { key, path };
+        state.selected = key;
+        try {
+            history.replaceState(null, '', `#${key}`);
+        }
+        catch { }
+        hideTip();
+        applyFocus();
+    }
+    svg.addEventListener('pointerover', (e) => {
+        if (drag?.moved)
+            return;
+        const target = e.target;
+        const row = target.closest('.xv-row');
+        const card = target.closest('.xv-card');
+        const edge = target.closest('.xv-edge');
+        const onHead = Boolean(card &&
+            !row &&
+            (target.closest('.xv-card-head, .xv-card-title, .xv-card-badge') ||
+                svg.classList.contains('lod-far')));
+        if (isPinned()) {
+            const live = (card && card.classList.contains('is-on')) || (!card && edge?.classList.contains('is-on'));
+            if (!live)
+                return hideTip();
+            if (row && card) {
+                const relation = relationOfRow(card.dataset.key, row.dataset.path);
+                const html = relation
+                    ? relationTip(relation, fieldIndex.get(card.dataset.key)?.get(row.dataset.path))
+                    : fieldTip(card.dataset.key, row.dataset.path);
+                if (html)
+                    showTip(html, e);
+                else
+                    hideTip();
+            }
+            else if (card && onHead) {
+                showTip(modelTip(card.dataset.key), e);
+            }
+            else if (edge && !card) {
+                const relation = DATA.relations.find((r) => r.id === edge.dataset.id);
+                if (relation)
+                    showTip(relationTip(relation), e);
+            }
+            else
+                hideTip();
+            return;
+        }
+        if (row && card) {
+            const relation = relationOfRow(card.dataset.key, row.dataset.path);
+            state.hoverEdge = relation ? relation.id : null;
+            state.hover = relation ? null : card.dataset.key;
+            const html = relation
+                ? relationTip(relation, fieldIndex.get(card.dataset.key)?.get(row.dataset.path))
+                : fieldTip(card.dataset.key, row.dataset.path);
+            if (html)
+                showTip(html, e);
+            else
+                hideTip();
+        }
+        else if (card) {
+            state.hover = card.dataset.key;
+            state.hoverEdge = null;
+            if (onHead)
+                showTip(modelTip(card.dataset.key), e);
+            else
+                hideTip();
+        }
+        else if (edge) {
+            state.hoverEdge = edge.dataset.id;
+            state.hover = null;
+            const relation = DATA.relations.find((r) => r.id === edge.dataset.id);
+            if (relation)
+                showTip(relationTip(relation), e);
+        }
+        else {
+            state.hover = null;
+            state.hoverEdge = null;
+            hideTip();
+        }
+        applyFocus();
+    });
+    svg.addEventListener('pointerleave', () => {
+        state.hover = null;
+        state.hoverEdge = null;
+        hideTip();
+        applyFocus();
+    });
+    stage.addEventListener('pointermove', (e) => {
+        if (!tip.hidden)
+            moveTip(e.clientX, e.clientY);
+    });
+    const fieldIndex = new Map();
+    for (const entity of DATA.entities) {
+        const index = new Map();
+        const walk = (fields) => fields.forEach((f) => {
+            index.set(f.path, f);
+            if (f.fields)
+                walk(f.fields);
+        });
+        walk(entity.fields);
+        entity.variants.forEach((v) => walk(v.fields));
+        fieldIndex.set(entity.key, index);
+    }
+    const decoratorHtml = (decorators) => decorators?.length
+        ? `<div class="tip-code">${decorators
+            .map((d) => esc(d).replace(/^(@[\w.]+)/, '<span class="tip-dec">$1</span>'))
+            .join('<br>')}</div>`
+        : '';
+    const TS_TOKENS = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/)|('(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*")|\b(interface|type|enum|extends|keyof|typeof|readonly|null|undefined|never|unknown|string|number|boolean|true|false)\b|\b([A-Z][A-Za-z0-9_]*)\b/g;
+    const highlightTs = (code) => {
+        let html = '';
+        let last = 0;
+        for (const m of code.matchAll(TS_TOKENS)) {
+            html += esc(code.slice(last, m.index));
+            const cls = m[1] ? 'c' : m[2] ? 's' : m[3] ? 'k' : 't';
+            html += `<span class="ts-${cls}">${esc(m[0])}</span>`;
+            last = m.index + m[0].length;
+        }
+        return html + esc(code.slice(last));
+    };
+    const MAX_CODE_LINES = 60;
+    const typeCodeHtml = (field) => {
+        if (!field.typeRefs)
+            return '';
+        const blocks = [`${field.name}: ${field.tsType ?? 'unknown'}`];
+        let lines = 1;
+        let skipped = 0;
+        for (const id of field.typeRefs) {
+            const text = DATA.types[id];
+            if (!text)
+                continue;
+            const count = text.split('\n').length;
+            if (lines + count > MAX_CODE_LINES) {
+                skipped++;
+                continue;
+            }
+            blocks.push(text);
+            lines += count + 1;
+        }
+        if (skipped)
+            blocks.push(`// … ещё ${plural(skipped, ['объявление', 'объявления', 'объявлений'])}`);
+        return `<pre class="tip-pre">${highlightTs(blocks.join('\n\n'))}</pre>`;
+    };
+    const fieldTip = (key, path) => {
+        const entity = byKey.get(key);
+        if (!entity)
+            return '';
+        if (path.startsWith('@')) {
+            const variant = entity.variants.find((v) => `@${v.value}` === path);
+            if (!variant)
+                return '';
+            return (`<b>${esc(entity.discriminatorKey)} = ${esc(variant.value)}</b> <span class="muted">${esc(variant.model)}</span>` +
+                `<div class="muted">поля ниже есть только у этого варианта</div>` +
+                decoratorHtml(variant.decorators) +
+                (variant.doc ? `<div>${md(variant.doc)}</div>` : ''));
+        }
+        const field = fieldIndex.get(key)?.get(path);
+        if (!field)
+            return '';
+        const type = field.kind === 'embedded'
+            ? `embedded · ${field.type ?? ''}`
+            : field.kind === 'id'
+                ? `PK · ${field.type ?? ''}`
+                : displayType(field);
+        return (`<b>${esc(key)}.${esc(path)}</b>${field.nullable ? '<span class="muted">?</span>' : ''} <span class="muted">${esc(type)}</span>` +
+            decoratorHtml(field.decorators) +
+            typeCodeHtml(field) +
+            (field.kind === 'embedded'
+                ? '<div class="muted">часть документа, не отдельная коллекция</div>'
+                : '') +
+            (field.values ? `<div class="muted">${field.values.map(esc).join(' | ')}</div>` : '') +
+            (field.doc ? `<div class="tip-doc">${md(field.doc)}</div>` : ''));
+    };
+    const DELETE_TEXT = {
+        cascade: 'удаление родителя удалит детей',
+        restrict: 'удаление цели запрещено, пока есть ссылка',
+        'set-null': 'при удалении цели ссылка станет null',
+        unlink: 'при удалении цели id уберётся из набора'
+    };
+    const KIND_TEXT = { own: 'композиция', ref: 'ссылка', set: 'набор ссылок' };
+    const relationTip = (r, field = fieldIndex.get(r.source)?.get(r.field)) => {
+        const from = `${r.source}.${r.field}`;
+        const del = r.kind === 'own' && r.onDelete === 'restrict'
+            ? 'родителя нельзя удалить, пока есть дети'
+            : DELETE_TEXT[r.onDelete];
+        return (`<b>${esc(from)}</b> <span style="color:${zoneColor(r.kind === 'own' ? r.source : r.target)}">→ ${esc(r.target)}</span>` +
+            `<div class="muted">${KIND_TEXT[r.kind]}${r.variant ? ` · только ${esc(r.variant)}` : ''}${r.nullable ? ' · может быть null' : ''}</div>` +
+            `<div><span class="del ${esc(r.onDelete)}">${esc(r.onDelete)}</span> ${esc(del)}</div>` +
+            decoratorHtml(field?.decorators) +
+            (field?.doc ? `<div class="tip-doc">${md(field.doc)}</div>` : ''));
+    };
+    const moveTip = (x, y) => {
+        const rect = tip.getBoundingClientRect();
+        const left = Math.min(x + 14, window.innerWidth - rect.width - 8);
+        const top = y + 18 + rect.height > window.innerHeight ? y - rect.height - 12 : y + 18;
+        tip.style.left = `${Math.max(8, left)}px`;
+        tip.style.top = `${Math.max(8, top)}px`;
+    };
+    const showTip = (html, e) => {
+        tip.innerHTML = html;
+        tip.hidden = false;
+        moveTip(e.clientX, e.clientY);
+    };
+    function hideTip() {
+        tip.hidden = true;
+    }
+    const applySearch = () => {
+        const q = state.query.trim().toLowerCase();
+        svg.classList.toggle('has-search', q !== '');
+        let count = 0;
+        cardEls.forEach((el, key) => {
+            const match = q !== '' && haystack.get(key).some((s) => s.includes(q));
+            el.classList.toggle('match', match);
+            if (match)
+                count++;
+            el.querySelectorAll('.xv-row').forEach((row) => {
+                row.classList.toggle('match', q !== '' && (row.dataset.path || '').toLowerCase().includes(q));
+            });
+        });
+        $('#xv-search-count').textContent = q ? String(count) : '';
+    };
+    search.addEventListener('input', () => {
+        state.query = search.value;
+        applySearch();
+    });
+    search.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const q = state.query.trim().toLowerCase();
+            const exact = DATA.entities.find((x) => x.key.toLowerCase() === q);
+            const first = exact ?? DATA.entities.find((x) => haystack.get(x.key).some((s) => s.includes(q)));
+            if (first)
+                select(first.key, { reveal: true });
+        }
+        else if (e.key === 'Escape') {
+            search.value = '';
+            state.query = '';
+            applySearch();
+            search.blur();
+        }
+    });
+    const applyHubMode = () => {
+        svg.classList.toggle('mode-shortcuts', state.hubMode === 'shortcuts');
+        document.querySelectorAll('[data-hub-mode]').forEach((b) => {
+            b.setAttribute('aria-pressed', String(b.dataset.hubMode === state.hubMode));
+        });
+        try {
+            localStorage.setItem('xv-hub-mode', state.hubMode);
+        }
+        catch { }
+        applyFocus();
+    };
+    document.querySelectorAll('[data-hub-mode]').forEach((b) => b.addEventListener('click', () => {
+        state.hubMode = b.dataset.hubMode;
+        applyHubMode();
+    }));
+    const displayType = (f) => {
+        const ts = f.tsType ? f.tsType.replace(/\s*\|\s*null$/, '') : '';
+        return ts && ts !== f.type ? ts : f.type || '';
+    };
+    const embeddedCount = (fields) => fields.reduce((n, f) => n + (f.kind === 'embedded' ? 1 + embeddedCount(f.fields || []) : 0), 0);
+    const listText = (items, max = 4) => items.length > max
+        ? `${items.slice(0, max).join(', ')} и ещё ${items.length - max}`
+        : items.join(', ');
+    const impactLines = (key) => {
+        const children = outgoing.get(key).filter((r) => r.kind === 'own');
+        const refsIn = incoming.get(key).filter((r) => r.kind !== 'own');
+        const blocked = [
+            ...children.filter((r) => r.onDelete === 'restrict').map((r) => r.target),
+            ...refsIn.filter((r) => r.onDelete === 'restrict').map((r) => `${r.source}.${r.field}`)
+        ];
+        const cascade = children.filter((r) => r.onDelete === 'cascade').map((r) => r.target);
+        const soft = refsIn.filter((r) => r.onDelete !== 'restrict').map((r) => `${r.source}.${r.field}`);
+        const lines = [];
+        if (blocked.length)
+            lines.push(`<span class="del restrict">restrict</span> запрещено, пока есть ${esc(listText(blocked))}`);
+        if (cascade.length)
+            lines.push(`<span class="del cascade">cascade</span> удалятся вместе: ${esc(listText(cascade))}`);
+        if (soft.length)
+            lines.push(`<span class="del set-null">set-null</span> обнулятся или отвяжутся: ${esc(listText(soft))}`);
+        return lines.length ? lines : ['удаляется без последствий: на неё не ссылаются, состава нет'];
+    };
+    const modelTip = (key) => {
+        const e = byKey.get(key);
+        if (!e)
+            return '';
+        const zone = zoneById.get(DATA.zoneOf[key]);
+        const blocks = embeddedCount(e.fields) + e.variants.reduce((n, v) => n + embeddedCount(v.fields), 0);
+        const meta = [
+            `ключ <code>${esc(e.idKey)}: ${esc(e.idType)}</code>`,
+            plural(fieldCount(e), ['поле', 'поля', 'полей']),
+            blocks ? plural(blocks, ['embedded-блок', 'embedded-блока', 'embedded-блоков']) : ''
+        ].filter(Boolean);
+        const links = `связей: исходящих ${outgoing.get(key).length}, входящих ${incoming.get(key).length}${hubs.has(key) ? `; хаб — ссылаются ${DATA.sources[key]} коллекций` : ''}`;
+        return (`<b>${esc(key)}</b>` +
+            (zone
+                ? ` <span class="tip-zone" style="color: var(${zone.colorVar})">${esc(zone.id)} · ${esc(zone.title)}</span>`
+                : '') +
+            `<div class="muted">модель ${esc(e.model)} · ${esc(e.file)}${e.namespace ? ` · ${esc(e.namespace)}` : ''}</div>` +
+            decoratorHtml(e.decorators) +
+            (e.doc ? `<div class="tip-doc">${md(e.doc)}</div>` : '') +
+            `<div class="tip-meta">${meta.join(' · ')}</div>` +
+            `<div class="tip-meta">${links}</div>` +
+            (e.variants.length
+                ? `<div class="tip-meta">варианты <code>${esc(e.discriminatorKey)}</code>: ${e.variants
+                    .map((v) => `${esc(v.value)} — ${esc(v.model)}`)
+                    .join(', ')}</div>`
+                : '') +
+            `<div class="tip-impact"><div class="muted">при удалении записи</div>${impactLines(key)
+                .map((line) => `<div>${line}</div>`)
+                .join('')}</div>`);
+    };
+    const legendEl = $('#xv-legend');
+    const legendButton = $('#xv-legend-toggle');
+    const legendHtml = () => {
+        const sample = (inner) => `<svg width="44" height="14" viewBox="0 0 44 14" aria-hidden="true">${inner}</svg>`;
+        const line = (dash = '') => `<line x1="2" y1="7" x2="33" y2="7" stroke="currentColor" stroke-width="1.4"${dash}/>`;
+        const arrow = (fill) => `<path d="M42,7 L33,2.5 L33,11.5 Z" fill="${fill}" stroke="currentColor" stroke-width="1.2"/>`;
+        const diamond = (fill) => `<path d="M2,7 L9.5,2.5 L17,7 L9.5,11.5 Z" fill="${fill}" stroke="currentColor"/><line x1="17" y1="7" x2="42" y2="7" stroke="currentColor" stroke-width="2"/>`;
+        const items = [
+            [
+                sample(line() + arrow('currentColor')),
+                'Ссылка',
+                'обязательная, удаление цели запрещено (restrict)'
+            ],
+            [sample(line() + arrow('var(--xv-surface)')), 'Полая стрелка', 'ссылка может быть null'],
+            [
+                sample(line(' stroke-dasharray="5 4"') + arrow('var(--xv-surface)')),
+                'Пунктир',
+                'при удалении цели ссылка обнулится или уйдёт из набора'
+            ],
+            [
+                sample(`<path d="M2,2 L12,7 L2,12 M2,7 L12,7" fill="none" stroke="currentColor" stroke-width="1.2"/>` +
+                    `<line x1="12" y1="7" x2="33" y2="7" stroke="currentColor" stroke-width="1.4"/>` +
+                    arrow('currentColor')),
+                'Воронья лапка',
+                'набор ссылок: массив id в поле'
+            ],
+            [sample(diamond('currentColor')), 'Ромб', 'композиция: дети удалятся вместе с родителем'],
+            [
+                sample(diamond('var(--xv-surface)')),
+                'Полый ромб',
+                'композиция: родителя нельзя удалить, пока есть дети'
+            ],
+            [
+                sample(`<defs><pattern id="xv-lg-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" stroke="currentColor" stroke-width="1.4" stroke-opacity="0.45"/></pattern></defs>` +
+                    `<rect x="1.5" y="1.5" width="41" height="11" rx="1" fill="url(#xv-lg-hatch)" stroke="currentColor" stroke-opacity="0.5"/>`),
+                'Штриховка',
+                'embedded-блок: часть документа, не отдельная коллекция'
+            ],
+            [
+                sample(`<rect x="1.5" y="1.5" width="41" height="11" rx="1" fill="currentColor" fill-opacity="0.18"/>`),
+                'Сплошная полоса',
+                'вариант дискриминатора: ниже поля только этого типа'
+            ]
+        ];
+        let html = `<div class="lg-head"><b>Легенда</b><button type="button" class="lg-close" data-close aria-label="Закрыть легенду">×</button></div>`;
+        html += `<p class="quiet">${plural(DATA.entities.length, ['коллекция', 'коллекции', 'коллекций'])}, ${plural(DATA.relations.length, ['связь', 'связи', 'связей'])}. Линия выходит из строки поля и окрашена в цвет зоны, куда ведёт.</p>`;
+        html += '<section><h3>Обозначения</h3><div class="legend">';
+        html += items
+            .map(([svgHtml, title, hint]) => `<div class="lg">${svgHtml}<span>${title}<small>${hint}</small></span></div>`)
+            .join('');
+        html += '</div></section><section><h3>Зоны</h3><div class="zones">';
+        html += DATA.zones
+            .map((z) => {
+            const count = DATA.entities.filter((e) => DATA.zoneOf[e.key] === z.id).length;
+            return `<button type="button" class="zone-row" data-zone="${esc(z.id)}" style="--t: var(${z.colorVar})"><span class="zone-dot"></span><span>${esc(z.id)} · ${esc(z.title)}</span><span class="quiet">${count}</span></button>`;
+        })
+            .join('');
+        html += '</div></section>';
+        if (hubs.size) {
+            html += `<section><h3>Хабы</h3><p class="quiet">${[...hubs]
+                .map((h) => `<button type="button" class="ent-link" data-key="${esc(h)}" style="--t:${zoneColor(h)}">${esc(h)}</button> — ${DATA.sources[h]} источников`)
+                .join(', ')}. В режиме «Ярлыки» их связи не рисуются линиями: цель видна в строке поля, а линия появляется при выделении.</p></section>`;
+        }
+        html +=
+            '<section><h3>Как пользоваться</h3><ul class="keys">' +
+                '<li>наведение на шапку модели — описание модели, на поле — тип, декоратор и JSDoc</li>' +
+                '<li>клик по шапке — закрепить связи модели, по полю — связи поля; повторный клик снимает</li>' +
+                '<li><kbd>/</kbd>поиск по коллекциям и полям</li><li><kbd>0</kbd>вписать карту</li>' +
+                '<li><kbd>?</kbd>легенда</li><li><kbd>Esc</kbd>сбросить выделение</li></ul></section>';
+        html += `<p class="quiet foot">Собрано ${esc(new Date(DATA.generatedAt).toLocaleString('ru-RU'))}</p>`;
+        return html;
+    };
+    function setLegend(open) {
+        legendEl.hidden = !open;
+        legendButton.setAttribute('aria-expanded', String(open));
+        try {
+            localStorage.setItem('xv-legend', open ? 'open' : 'closed');
+        }
+        catch { }
+    }
+    legendEl.innerHTML = legendHtml();
+    legendButton.addEventListener('click', () => setLegend(legendEl.hidden));
+    legendEl.addEventListener('click', (e) => {
+        const target = e.target;
+        if (target.closest('[data-close]'))
+            return setLegend(false);
+        const zone = target.closest('[data-zone]');
+        if (zone)
+            return revealZone(zone.dataset.zone);
+        const item = target.closest('[data-key]');
+        if (item)
+            select(item.dataset.key, { reveal: true });
+    });
+    function select(key, options = {}) {
+        state.pin = null;
+        state.beforePin = null;
+        state.hover = null;
+        state.hoverEdge = null;
+        state.selected = key && byKey.has(key) ? key : null;
+        try {
+            history.replaceState(null, '', state.selected ? `#${state.selected}` : location.pathname + location.search);
+        }
+        catch { }
+        applyFocus();
+        if (state.selected && options.reveal)
+            reveal(state.selected);
+    }
+    document.addEventListener('keydown', (e) => {
+        const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
+        if (typing)
+            return;
+        if (e.key === '/') {
+            e.preventDefault();
+            search.focus();
+            search.select();
+        }
+        else if (e.key === 'Escape') {
+            select(null);
+        }
+        else if (e.key === '?') {
+            setLegend(legendEl.hidden);
+        }
+        else if (e.key === '0') {
+            fitAll();
+        }
+        else if (e.key === '+' || e.key === '=' || e.key === '-') {
+            const factor = e.key === '-' ? 1 / 1.25 : 1.25;
+            const w = stage.clientWidth / view.k;
+            const h = stage.clientHeight / view.k;
+            const k = Math.max(MIN_K, Math.min(MAX_K, view.k * factor));
+            animateTo({
+                x: view.x + w / 2 - stage.clientWidth / 2 / k,
+                y: view.y + h / 2 - stage.clientHeight / 2 / k,
+                k
+            });
+        }
+    });
+    const onTheme = () => applyView();
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onTheme);
+    let legendOpen = false;
+    try {
+        legendOpen = localStorage.getItem('xv-legend') === 'open';
+    }
+    catch { }
+    setLegend(legendOpen);
+    let restore = null;
+    try {
+        restore = JSON.parse(sessionStorage.getItem('xv-restore') || 'null');
+        sessionStorage.removeItem('xv-restore');
+    }
+    catch { }
+    applyHubMode();
+    if (restore?.view) {
+        Object.assign(view, restore.view);
+        applyView();
+    }
+    else
+        fitAll(false);
+    let stageSize = { w: stage.clientWidth, h: stage.clientHeight };
+    new ResizeObserver(() => {
+        const w = stage.clientWidth;
+        const h = stage.clientHeight;
+        if (!w || !h)
+            return;
+        view.x += (stageSize.w - w) / 2 / view.k;
+        view.y += (stageSize.h - h) / 2 / view.k;
+        stageSize = { w, h };
+        applyView();
+    }).observe(stage);
+    const params = new URLSearchParams(location.search);
+    const query = restore ? restore.query : params.get('q');
+    if (query) {
+        search.value = query;
+        state.query = query;
+        applySearch();
+    }
+    if (restore) {
+        if (restore.pin && byKey.has(restore.pin.key)) {
+            togglePin(restore.pin.key, restore.pin.path);
+            state.beforePin = restore.beforePin ?? null;
+        }
+        else if (restore.selected && byKey.has(restore.selected)) {
+            select(restore.selected);
+        }
+    }
+    else {
+        const fromHash = decodeURIComponent(location.hash.slice(1));
+        if (byKey.has(fromHash))
+            select(fromHash, { reveal: true });
+        const pinParam = params.get('pin');
+        if (pinParam && pinParam.includes('.')) {
+            const dot = pinParam.indexOf('.');
+            if (byKey.has(pinParam.slice(0, dot)))
+                togglePin(pinParam.slice(0, dot), pinParam.slice(dot + 1));
+        }
+    }
+    if (params.get('hubs') === 'shortcuts' || params.get('hubs') === 'lines') {
+        state.hubMode = params.get('hubs');
+        applyHubMode();
+    }
+    ;
+    window.__xv = {
+        state: () => ({
+            view: { ...view },
+            selected: state.selected,
+            pin: state.pin,
+            beforePin: state.beforePin,
+            query: state.query
+        })
+    };
+    if (DEBUG) {
+        const out = $('#xv-debug');
+        const sample = DATA.entities[0];
+        out.hidden = false;
+        out.textContent = JSON.stringify({
+            errors,
+            cards: cardEls.size,
+            edgesAll: layer('all').querySelectorAll('.xv-edge').length,
+            edgesNohub: layer('nohub').querySelectorAll('.xv-edge').length,
+            selected: state.selected,
+            pin: state.pin,
+            locked: svg.classList.contains('is-locked'),
+            focusedEdges: svg.querySelectorAll('.xv-edge.is-on').length,
+            focusedCards: svg.querySelectorAll('.xv-card.is-on').length,
+            searchMatches: svg.querySelectorAll('.xv-card.match').length,
+            restored: Boolean(restore),
+            floats: [...document.querySelectorAll('.xv-float')].map((el) => {
+                const r = el.getBoundingClientRect();
+                return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)];
+            }),
+            stage: { w: stage.clientWidth, h: stage.clientHeight },
+            view: { ...view },
+            lod: svg.classList.contains('lod-far'),
+            hubMode: state.hubMode,
+            legend: legendEl.hidden ? 'closed' : 'open',
+            blockRows: svg.querySelectorAll('.xv-row.block').length,
+            variantRows: svg.querySelectorAll('.xv-row.variant').length,
+            modelTip: sample
+                ? modelTip(sample.key)
+                    .replace(/<[^>]+>/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .slice(0, 300)
+                : ''
+        });
+    }
+})();
+</script>

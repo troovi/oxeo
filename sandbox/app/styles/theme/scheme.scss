@@ -1,0 +1,576 @@
+@use '@companix/uikit/dist/theme.scss';
+
+$scheme: (
+  icon: (
+    size_xxxs: 12px,
+    size_xxs: 1rem,
+    size_xs: 1.25rem,
+    size_s: 1.55rem,
+    size_m: 2rem,
+    size_l: 1.5rem,
+    size_xl: 2rem,
+    size_xxl: 3rem,
+    size_xxxl: 4.5rem
+  ),
+  button: (
+    font-family: inherit,
+    border-radius: 8px,
+    font-weight: normal,
+    // sm
+    size_sm_height: 1.75rem,
+    size_sm_font-family: inherit,
+    size_sm_line-height: inherit,
+    size_sm_padding: 0 1rem,
+    // md
+    size_md_height: 2rem,
+    size_md_font-family: inherit,
+    size_md_line-height: inherit,
+    size_md_padding: 0 1rem,
+    // lg
+    size_lg_height: 2.25rem,
+    size_lg_font-family: inherit,
+    size_lg_line-height: inherit,
+    size_lg_padding: 0 1rem,
+    //
+    // ----------------  primary ----------------
+    //
+    // default
+    primary_default_enabled_color: var(--button-primary-tx),
+    primary_default_enabled_background: var(--button-primary-bg),
+    primary_default_enabled_box-shadow: var(--button-shadow),
+    primary_default_hovered_background: var(--button-primary-bg-hovered),
+    primary_default_hovered_box-shadow: var(--button-shadow-hovered),
+    primary_default_pressed_background: var(--button-primary-bg-pressed),
+    primary_default_disable_background: var(--button-primary-bg-disable),
+    primary_default_disable_box-shadow: none,
+    primary_default_disable_color: var(--button-primary-tx-disable),
+    // outlined
+    primary_outline_enabled_color: var(--button-primary-outline-tx),
+    primary_outline_enabled_border: 1px solid var(--button-primary-outline-border),
+    primary_outline_hovered_background: var(--button-primary-outline-bg-hovered),
+    primary_outline_pressed_background: var(--button-primary-outline-bg-pressed),
+    primary_outline_pressed_color: var(--button-primary-outline-tx-pressed),
+    primary_outline_disable_border: 1px solid var(--button-primary-outline-border-disabled),
+    primary_outline_disable_color: var(--button-primary-outline-tx-disabled),
+    primary_outline_disable_background: none,
+    // minimal
+    primary_minimal_enabled_color: var(--button-primary-outline-tx),
+    primary_minimal_hovered_background: var(--button-primary-outline-bg-hovered),
+    primary_minimal_pressed_background: var(--button-primary-outline-bg-pressed),
+    primary_minimal_pressed_color: var(--button-primary-outline-tx-pressed),
+    primary_minimal_disable_background: none,
+    primary_minimal_disable_color: var(--button-primary-outline-tx-disabled),
+    //
+    // ----------------  neutral ----------------
+    //
+    // default
+    neutral_default_enabled_color: var(--button-neutral-tx),
+    neutral_default_enabled_background: var(--button-neutral-bg),
+    neutral_default_enabled_box-shadow: var(--button-shadow),
+    neutral_default_hovered_background: var(--button-neutral-bg-hovered),
+    neutral_default_hovered_box-shadow: var(--button-shadow-hovered),
+    neutral_default_pressed_background: var(--button-neutral-bg-pressed),
+    neutral_default_disable_background: var(--button-neutral-bg-disable),
+    neutral_default_disable_box-shadow: none,
+    neutral_default_disable_color: var(--button-neutral-tx-disable),
+    // outlined
+    neutral_outline_enabled_color: var(--button-neutral-tx),
+    neutral_outline_enabled_border: 1px solid var(--button-neutral-outline-border),
+    neutral_outline_hovered_background: var(--button-neutral-outline-bg-hovered),
+    neutral_outline_pressed_background: var(--button-neutral-outline-bg-pressed),
+    neutral_outline_disable_border: 1px solid var(--button-neutral-outline-border-disabled),
+    neutral_outline_disable_color: var(--button-neutral-tx-disable),
+    neutral_outline_disable_background: none,
+    // minimal
+    neutral_minimal_enabled_color: var(--button-neutral-tx),
+    neutral_minimal_hovered_background: var(--button-neutral-outline-bg-hovered),
+    neutral_minimal_pressed_background: var(--button-neutral-outline-bg-pressed),
+    neutral_minimal_disable_background: none,
+    neutral_minimal_disable_color: var(--button-neutral-tx-disable),
+    //
+    // ----------------  positive ----------------
+    //
+    // default
+    positive_default_enabled_color: var(--button-positive-tx),
+    positive_default_enabled_background: var(--button-positive-bg),
+    positive_default_enabled_box-shadow: var(--button-shadow),
+    positive_default_hovered_background: var(--button-positive-bg-hovered),
+    positive_default_hovered_box-shadow: var(--button-shadow-hovered),
+    positive_default_pressed_background: var(--button-positive-bg-pressed),
+    positive_default_disable_background: var(--button-positive-bg-disable),
+    positive_default_disable_box-shadow: none,
+    positive_default_disable_color: var(--button-positive-tx-disable),
+    // outlined
+    positive_outline_enabled_color: var(--button-positive-outline-tx),
+    positive_outline_enabled_border: 1px solid var(--button-positive-outline-border),
+    positive_outline_hovered_background: var(--button-positive-outline-bg-hovered),
+    positive_outline_pressed_background: var(--button-positive-outline-bg-pressed),
+    positive_outline_pressed_color: var(--button-positive-outline-tx-pressed),
+    positive_outline_disable_border: 1px solid var(--button-positive-outline-border-disabled),
+    positive_outline_disable_color: var(--button-positive-outline-tx-disable),
+    positive_outline_disable_background: none,
+    // minimal
+    positive_minimal_enabled_color: var(--button-positive-outline-tx),
+    positive_minimal_hovered_background: var(--button-positive-outline-bg-hovered),
+    positive_minimal_pressed_background: var(--button-positive-outline-bg-pressed),
+    positive_minimal_pressed_color: var(--button-positive-outline-tx-pressed),
+    positive_minimal_disable_background: none,
+    positive_minimal_disable_color: var(--button-positive-outline-tx-disable),
+    //
+    // ----------------  negative ----------------
+    //
+    // default
+    negative_default_enabled_color: var(--button-negative-tx),
+    negative_default_enabled_background: var(--button-negative-bg),
+    negative_default_enabled_box-shadow: var(--button-shadow),
+    negative_default_hovered_background: var(--button-negative-bg-hovered),
+    negative_default_hovered_box-shadow: var(--button-shadow-hovered),
+    negative_default_pressed_background: var(--button-negative-bg-pressed),
+    negative_default_disable_background: var(--button-negative-bg-disable),
+    negative_default_disable_box-shadow: none,
+    negative_default_disable_color: var(--button-negative-tx-disable),
+    // outlined
+    negative_outline_enabled_color: var(--button-negative-outline-tx),
+    negative_outline_enabled_border: 1px solid var(--button-negative-outline-border),
+    negative_outline_hovered_background: var(--button-negative-outline-bg-hovered),
+    negative_outline_pressed_background: var(--button-negative-outline-bg-pressed),
+    negative_outline_pressed_color: var(--button-negative-outline-tx-pressed),
+    negative_outline_disable_border: 1px solid var(--button-negative-outline-border-disabled),
+    negative_outline_disable_color: var(--button-negative-outline-tx-disable),
+    negative_outline_disable_background: none,
+    // minimal
+    negative_minimal_enabled_color: var(--button-negative-outline-tx),
+    negative_minimal_hovered_background: var(--button-negative-outline-bg-hovered),
+    negative_minimal_pressed_background: var(--button-negative-outline-bg-pressed),
+    negative_minimal_pressed_color: var(--button-negative-outline-tx-pressed),
+    negative_minimal_disable_background: none,
+    negative_minimal_disable_color: var(--button-negative-outline-tx-disable)
+  ),
+  popover: (
+    border-radius: 6px,
+    content_border-radius: 6px,
+    default_in_animation:
+      'popoverScaleIn 300ms cubic-bezier(0.54, 1.12, 0.38, 1.11), fadeIn 100ms cubic-bezier(0.4, 1, 0.75, 0.9)',
+    default_out_animation:
+      'popoverScaleOut 300ms cubic-bezier(0.54, 1.12, 0.38, 1.11), fadeOut 100ms cubic-bezier(0.4, 1, 0.75, 0.9)',
+    minimal_in_animation: 'fadeIn 100ms cubic-bezier(0.4, 1, 0.75, 0.9)',
+    minimal_out_animation: 'fadeOut 100ms cubic-bezier(0.4, 1, 0.75, 0.9)',
+    arrow_box-shadow: var(--popover-arrow-shadow),
+    box-shadow: var(--popover-shadow),
+    content_background: var(--popover-bg)
+  ),
+  tooltip: (
+    padding: 6px 12px,
+    max-width: 400px,
+    font-size: 0.8rem,
+    in_animation:
+      'popoverScaleIn 300ms cubic-bezier(0.54, 1.12, 0.38, 1.11), fadeIn 100ms cubic-bezier(0.4, 1, 0.75, 0.9)',
+    out_animation:
+      'popoverScaleOut 300ms cubic-bezier(0.54, 1.12, 0.38, 1.11), fadeOut 100ms cubic-bezier(0.4, 1, 0.75, 0.9)',
+    background: var(--tooltip-bg),
+    color: var(--tooltip-tx)
+  ),
+  alert: (
+    container_padding: 20px,
+    padding: 20px,
+    width: 400px,
+    title_font-weight: 600,
+    title_font-size: 18px,
+    body_gap: 20px,
+    content_gap: 4px,
+    icon_size: 38px,
+    footer_padding-top: 20px,
+    footer_gap: 8px,
+    icon_color: #ac2f33
+  ),
+  checkbox: (
+    label_padding-left: 0.5rem,
+    size_sm_box: 1.25rem,
+    size_md_box: 1.5rem,
+    size_md_font-size: 1rem,
+    size_sm_font-size: 0.8rem,
+    box_border-radius: 8px,
+    icon_in_animation: 'checkboxIn 200ms, checkboxInColor 100ms',
+    icon_out_animation: 'checkboxOutColor 150ms',
+    disabled_opacity: 48%,
+    color: var(--checkbox-tx),
+    box_color: var(--checkbox-mark-bg),
+    box_background: var(--checkbox-bg),
+    box_hovered_background: var(--checkbox-bg-hovered),
+    box_pressed_background: var(--checkbox-bg-pressed),
+    box_checked_background: var(--checkbox-bg-checked),
+    required_color: var(--theme-negative-color),
+    required_box_border: 1.5px solid var(--theme-negative-color)
+  ),
+  radio: (
+    size_sm_box: 1.25rem,
+    size_md_box: 1.5rem,
+    size_sm_mark: 0.625rem,
+    size_md_mark: 0.75rem,
+    size_md_font-size: 1rem,
+    size_sm_font-size: 0.8rem,
+    group_gap: 0.8rem,
+    label_padding-left: 0.5rem,
+    box_border-radius: 50%,
+    mark_border-radius: 50%,
+    mark_in_animation: 'fadeIn 100ms, markScaleIn 200ms',
+    mark_out_animation: 'fadeOut 100ms, markScaleOut 200ms',
+    disabled_opacity: 48%,
+    color: var(--checkbox-tx),
+    box_background: var(--checkbox-bg),
+    box_hovered_background: var(--checkbox-bg-hovered),
+    box_pressed_background: var(--checkbox-bg-pressed),
+    box_checked_background: var(--checkbox-bg-checked),
+    mark_background: var(--radio-mark-bg),
+    required_color: var(--theme-negative-color),
+    required_box_border: 1.5px solid var(--theme-negative-color)
+  ),
+  tab: (
+    height: 45px,
+    font-size: 1rem,
+    padding: 0 20px,
+    transition: 'color, 200ms ease',
+    indicator_container_transition: 'height, transform, width, 320ms cubic-bezier(0.4, 1, 0.75, 0.9)',
+    indicator_height: 3px,
+    disabled_opacity: 0.5,
+    color: var(--tab-tx),
+    hovered_color: var(--tab-hovered),
+    pressed_color: var(--theme-primary-color),
+    indicator_background: var(--theme-primary-color),
+    container_border-bottom: 1px solid var(--tab-underlib)
+  ),
+  toaster: (
+    border-radius: 8px,
+    padding: 1rem,
+    min-width: 400px,
+    max-width: 600px,
+    viewport_offset: 20px,
+    content_gap: 1px,
+    title_font-size: 0.875rem,
+    description_font-size: 0.875rem,
+    title_font-weight: 600,
+    icon_margin-right: 0.8rem,
+    icon_size: 1.25rem,
+    close_size: 1rem,
+    close_space: 6px,
+    close_padding: 4px,
+    box-shadow: var(--toaster-shadow),
+    close_color: var(--toaster-close),
+    close_hover_color: var(--toaster-close-hovered),
+    // appearances
+    // primary
+    primary_background: var(--toaster-primary-bg),
+    primary_color: var(--theme-primary-color),
+    primary_border: 1px solid var(--toaster-primary-border),
+    // neutral
+    neutral_background: var(--theme-bg),
+    neutral_icon_color: var(--theme-hint-color),
+    neutral_border: 1px solid var(--toaster-neutral-border),
+    // negative
+    negative_background: var(--toaster-negative-bg),
+    negative_color: var(--theme-negative-color),
+    negative_border: 1px solid var(--toaster-negative-border),
+    // positive
+    positive_background: var(--toaster-positive-bg),
+    positive_color: var(--theme-positive-color),
+    positive_border: 1px solid var(--toaster-positive-border),
+    // warning
+    warning_background: var(--toaster-warning-bg),
+    warning_color: var(--theme-warning-color),
+    warning_border: 1px solid var(--toaster-warning-border)
+  ),
+  dialog: (
+    border-radius: 4px,
+    in_animation: dialogIn 300ms cubic-bezier(0.54, 1.12, 0.38, 1.11),
+    out_animation: dialogOut 300ms cubic-bezier(0.54, 1.12, 0.38, 1.11),
+    container_padding: 20px,
+    // overlay
+    overlay_in_animation: fadeIn 200ms cubic-bezier(0.4, 1, 0.75, 0.9),
+    overlay_out_animation: fadeOut 200ms cubic-bezier(0.4, 1, 0.75, 0.9),
+    // size
+    size_xxs_max-width: 500px,
+    size_xs_max-width: 500px,
+    size_s_max-width: 500px,
+    size_m_max-width: 500px,
+    size_l_max-width: 500px,
+    size_xl_max-width: 500px,
+    size_xxl_max-width: 500px,
+    // full-size
+    size_full_width: 100%,
+    size_full_height: 100%,
+    size_full_container_padding: 0px,
+    size_full_border-radius: 0px,
+    overlay_background: var(--dialog-overlay-bg),
+    background: var(--dialog-bg),
+    box-shadow: var(--dialog-shadow)
+  ),
+  form: (
+    space: 12px,
+    space-y: 6px,
+    background: var(--form-bg),
+    color: var(--form-tx),
+    box-shadow: var(--form-shadow),
+    border: 1px solid var(--form-border),
+    font-weight: 400,
+    border-radius: 8px,
+    transition: 'background .15s ease, border .15s ease, box-shadow .15s ease, color .15s ease',
+    placeholder_color: var(--form-placeholder),
+    // focus
+    focus_border-color: var(--form-focus-border),
+    focus_box-shadow:
+      '0 1px 2px rgba(17, 20, 24, 0.1), 0 1px 1px rgba(0, 0, 0, .03), 0 3px 6px rgba(0, 0, 0, .02), 0 0 0 3px rgba(5, 115, 225, .25), 0 1px 1px 0 rgba(0, 0, 0, .08)',
+    // sizes
+    size_md_height: 36px,
+    size_md_font-size: 16px,
+    size_sm_height: 30px,
+    size_sm_font-size: 14px,
+    size_lg_height: 42px,
+    size_lg_font-size: 18px,
+    // disabled
+    disabled_box-shadow: none,
+    disabled_cursor: not-allowed,
+    // required
+    required_border-color: var(--theme-negative-color),
+    required_box-shadow: 0 0 3px 1px rgb(245 53 53 / 40%),
+    // disabled
+    disabled_color: var(--form-tx-disabled),
+    disabled_background: var(--form-bg-disabled),
+    disabled_border-color: var(--form-bg-disabled)
+  ),
+  form-group: (
+    label_margin-bottom: 4px,
+    caption_margin-top: 2px,
+    caption_font-size: 14px,
+    caption_negative_color: var(--theme-negative-color),
+    label_color: var(--form-group-tx),
+    caption_neutral_color: var(--theme-hint-color)
+  ),
+  drawer: (
+    overlay_background: rgba(0, 0, 0, 0.5),
+    radius: 10px,
+
+    overlay_in_animation: fadeIn 500ms cubic-bezier(0.32, 0.72, 0, 1),
+    overlay_out_animation: drawerOverlayOut 500ms cubic-bezier(0.32, 0.72, 0, 1),
+    //
+    in_left_animation: slideFromLeft 500ms cubic-bezier(0.32, 0.72, 0, 1),
+    out_left_animation: slideToLeft 500ms cubic-bezier(0.32, 0.72, 0, 1),
+    //
+    in_right_animation: slideFromRight 500ms cubic-bezier(0.32, 0.72, 0, 1),
+    out_right_animation: slideToRight 500ms cubic-bezier(0.32, 0.72, 0, 1),
+    //
+    in_bottom_animation: slideFromBottom 500ms cubic-bezier(0.32, 0.72, 0, 1),
+    out_bottom_animation: slideToBottom 500ms cubic-bezier(0.32, 0.72, 0, 1),
+    //
+    in_top_animation: slideFromTop 500ms cubic-bezier(0.32, 0.72, 0, 1),
+    out_top_animation: slideToTop 500ms cubic-bezier(0.32, 0.72, 0, 1),
+    background: var(--dialog-bg),
+    box-shadow: var(--drawer-shadow)
+  ),
+  select: (
+    tools_color: var(--select-tools-color),
+    tools_hovered_color: var(--select-tools-color-hovered)
+  ),
+  tag: (
+    gap: 0px,
+    font-size: 14px,
+    border-radius: 6px,
+    color: var(--tags-tx),
+    background-color: var(--tags-bg),
+    border: 1px solid var(--tags-border),
+    // close
+    close_padding: 4px,
+    close_size: 12px,
+    close_color: var(--tags-close),
+    close_hover_color: var(--tags-close-hovered),
+    // name
+    name_padding-left: 6px,
+    // container
+    container_gap: 4px,
+    container_padding: 6px,
+    // noneresults
+    noneresults_text-align: center,
+    noneresults_font-size: 14px,
+    noneresults_color: var(--theme-hint-color)
+  ),
+  option: (
+    padding: 6px 8px,
+    border-radius: 4px,
+    check_margin-left: 8px,
+    check_size: 16px,
+    list_padding: 10px 0px,
+    label_opacity: 0.4,
+    label_font-size: 14px,
+    disabled_opacity: 0.3,
+    check_color: var(--option-check),
+    hovered_background: var(--option-hovered),
+    pressed_background: var(--option-pressed),
+    minimal_selected_background-color: var(--option-minimal-selected-bg),
+    minimal_selected_color: var(--option-minimal-selected-tx)
+  ),
+  avatar: (
+    border-radius: 100%,
+    border_border: 1px solid var(--avatar-border),
+    initials_font-weight: 600,
+    background: var(--avatar-bg),
+    color: var(--avatar-tx)
+  ),
+  segment-control: (
+    container_padding: 2px,
+    container_border-radius: 8px,
+    container_height: 36px,
+    container_background-color: var(--segment-container-bg),
+    // slider
+    slider_transition: all 210ms,
+    slider_box-shadow:
+      'inset 0 0 0 .5px rgba(0,0,0,0.08),0 3px 8px rgb(0,0,0,.12),0 3px 1px rgb(0,0,0,.04)',
+    slider_background-color: var(--segment-slider-bg),
+    // option
+    option_padding: 0px 20px,
+    option_justify-content: center,
+    option_transition: background 80ms,
+    option_hovered_background: var(--segment-option-hovered),
+    option_pressed_background: var(--segment-option-pressed)
+  ),
+  spinner: (
+    color: var(--spinner-tx)
+  ),
+  skeleton: (
+    background: var(--skeleton-from-bg),
+    to_background: var(--skeleton-to-bg)
+  ),
+  write-bar: (
+    border-radius: 12px,
+    box-shadow: '0px 0px 2px rgba(0, 0, 0, 0.08), 0px 4px 16px rgba(0, 0, 0, 0.08)',
+    background-color: var(--write-bar-bg),
+    placeholder_color: var(--theme-hint-color),
+    icon_attach_color: var(--write-bar-icon),
+    icon_send_color: var(--theme-primary-color)
+  ),
+  drop-area: (
+    background: var(--theme-bg)
+  ),
+  drop-target: (
+    icon_size: 38px,
+    rect_stroke: var(--theme-hint-color),
+    text_color: var(--theme-hint-color),
+    icon_color: var(--theme-hint-color),
+    hovered_rect_stroke: var(--theme-primary-color),
+    hovered_color: var(--theme-primary-color)
+  ),
+  calendar: (
+    padding: 12px,
+    // name
+    name_width: 40px,
+    name_height: 32px,
+    name_color: var(--theme-subhead-color),
+    name_font-size: 14px,
+    // navigation
+    navigation_color: var(--theme-accent-color),
+    navigation_hover_background: rgb(0 0 0 / 6%),
+    navigation_active_background: rgb(0 0 0 / 8%),
+    navigation_border-radius: 6px,
+    navigation_size: 36px,
+    navigation_icon_size: 20px,
+    // day
+    day_width: 40px,
+    day_height: 36px,
+    day_font-size: 14px,
+    day_border-radius: 8px,
+    day_hover_background: var(--calendar-day-hovered),
+    day_disabled_color: var(--calendar-day-disable),
+    day_selected_background: var(--theme-accent-color),
+    day_selected_color: #ffffff,
+    // header
+    header_height: 36px
+  ),
+  switch: (
+    disabled_opacity: 0.6,
+    // track
+    track_width: 47px,
+    track_min-width: 47px,
+    track_height: 27px,
+    track_disabled_cursor: not-allowed,
+    track_unchecked_background-color: var(--switch-uncheck-bg),
+    track_checked_background-color: var(--theme-primary-color),
+    track_border-radius: calc(47px / 2),
+    track_transition: background-color 200ms linear,
+    track_outline_width: 2px,
+    // thumb
+    thumb_size: 23px,
+    thumb_transition: transform 200ms cubic-bezier(0.36, -0.24, 0.26, 1.32),
+    thumb_background: var(--switch-thumb-bg),
+    thumb_box-shadow:
+      '0 3px 8px rgb(0, 0, 0, 0.15), 0 3px 1px rgb(0, 0, 0, 0.06), inset 0 0 0 0.5px rgb(0, 0, 0, 0.04)',
+    // label
+    label_disabled_cursor: not-allowed,
+    label_padding-left: 0.5rem,
+    // icon
+    icon_opacity: 0,
+    icon_transition: opacity 100ms cubic-bezier(0.4, 0, 0.2, 1),
+    icon_size: 12px,
+    icon_visible_opacity: 1,
+    icon_unchecked_color: var(--theme-negative-color),
+    icon_checked_color: var(--theme-confirm-color)
+  ),
+  blank: (
+    // neutral
+    neutral_color: var(--theme-hint-color),
+    neutral_icon_color: var(--theme-hint-color),
+    neutral_icon_opacity: 0.6,
+    neutral_description_opacity: 0.6,
+    // negative
+    negative_color: var(--theme-negative-color),
+    negative_description_opacity: 0.6,
+    negative_icon_color: var(--theme-negative-color),
+    negative_title_color: var(--theme-negative-color)
+  ),
+  progress: (
+    background: var(--progress-bg),
+    height: 8px,
+    // primary
+    thumb_primary_background-color: var(--theme-primary-color),
+    // neutral
+    thumb_neutral_background-color: var(--theme-neutral-color),
+    // positive
+    thumb_positive_background-color: var(--theme-positive-color),
+    // negative
+    thumb_negative_background-color: var(--theme-negative-color)
+  ),
+  progress-ring: (
+    track_stroke: var(--progress-bg),
+    indicator_transition-duration: 400ms,
+    // primary
+    primary_indicator_stroke: var(--theme-primary-color),
+    // neutral
+    neutral_indicator_stroke: var(--theme-neutral-color),
+    // positive
+    positive_indicator_stroke: var(--theme-positive-color),
+    // negative
+    negative_indicator_stroke: var(--theme-negative-color)
+  )
+);
+
+:root {
+  @include theme.use-tokens($scheme);
+}
+
+// TODO: layout не должны преобразовываться в переменные, а должны применяться как значения
+// @include theme.use-layout($layout);
+
+// $global: (
+//   toaster: (
+//     viewport_offset: 20px,
+//     close_space: 6px
+//   ),
+//   form: (
+//     space: 12px,
+//     space-y: 6px,
+//     border-radius: 8px
+//   ),
+//   switch: (
+//     track_width: 47px,
+//     track_height: 27px,
+//     track_outline_width: 2px,
+//     thumb_size: 23px
+//   )
+// );

@@ -1,0 +1,5 @@
+{
+  "main": "../dist/filter.cjs.js",
+  "module": "../dist/filter.esm.js",
+  "types": "../lib/filter/index.ts"
+}

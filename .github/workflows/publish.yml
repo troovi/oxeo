@@ -1,0 +1,60 @@
+name: publish-packages
+# Публикация выключена: push workflow не запускает. Включить — вернуть вместо workflow_dispatch:
+#   push:
+#     branches:
+#       - master
+on:
+  workflow_dispatch:
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            core/scheme:
+              - 'core/scheme/package.json'
+            core/server:
+              - 'core/server/package.json'
+            core/client:
+              - 'core/client/package.json'
+            core/react:
+              - 'core/react/package.json'
+            core/types:
+              - 'core/types/package.json'
+            drivers/mongo:
+              - 'drivers/mongo/package.json'
+            drivers/memory:
+              - 'drivers/memory/package.json'
+            tools/visual:
+              - 'tools/visual/package.json'
+
+  publish:
+    needs: changes
+    if: ${{ needs.changes.outputs.packages != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.changes.outputs.packages) }}
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run build
+      - run: npm run github:setup
+      - run: npm publish --access public
+        working-directory: ${{ matrix.package }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

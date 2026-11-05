@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "strictPropertyInitialization": false,
+    "module": "commonjs",
+    "declaration": true,
+    "removeComments": true,
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": true,
+    "target": "es2017",
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": false,
+    "noFallthroughCasesInSwitch": false,
+    "resolveJsonModule": true,
+    "types": ["node", "multer"],
+    "outDir": "./dist"
+  },
+  "include": ["./**/*.ts", "./*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

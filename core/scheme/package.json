@@ -1,0 +1,41 @@
+{
+  "name": "@oxeo/scheme",
+  "version": "0.2.0",
+  "description": "Схема данных и контракт доменов oxeo: то, на чём пишется общий core проекта",
+  "main": "dist/bundle.cjs.js",
+  "module": "dist/bundle.esm.js",
+  "types": "./lib/index.ts",
+  "files": [
+    "dist",
+    "filter",
+    "lib/filter"
+  ],
+  "scripts": {
+    "echo": "echo \"@oxeo/scheme.\"",
+    "build": "rm -rf dist && rollup --config rollup.config.ts --configPlugin @rollup/plugin-typescript --bundleConfigAsCjs",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "zod": "^4.0.0"
+  },
+  "dependencies": {
+    "@companix/utils-js": "latest",
+    "fast-deep-equal": "^3.1.3"
+  },
+  "devDependencies": {
+    "@oxeo/devkit": "file:../../tools/devkit",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-strip": "^3.0.4",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^11.1.6",
+    "@typescript-eslint/parser": "^5.62.0",
+    "eslint-config-react-app": "^7.0.1",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-react": "^7.34.3",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "rollup": "^4.18.1",
+    "rollup-plugin-auto-external": "^2.0.0",
+    "vitest": "^3.2.4",
+    "zod": "^4.3.6"
+  }
+}

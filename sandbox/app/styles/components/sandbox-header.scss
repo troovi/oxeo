@@ -1,0 +1,20 @@
+// Шапка дашборда — карточка, как панели: имя версии и сброс базы.
+.sandbox-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: var(--sandbox-bar-height);
+  padding: 0 10px 0 14px;
+  border: 1px solid var(--splitter-bg);
+  border-radius: 8px;
+  background-color: var(--panel-bg);
+
+  &-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: inherit;
+    text-decoration: none;
+  }
+}

@@ -1,0 +1,44 @@
+@use './tokens.dark.scss' as dark;
+@use './tokens.light.scss' as light;
+
+// main styles
+:root {
+  --theme-primary-color: #2d72d2;
+  --theme-negative-color: #f53535;
+  --theme-positive-color: #279c2f;
+  --theme-neutral-color: #7f8896;
+  --theme-warning-color: #da8607;
+  --theme-accent-color: #529ef4;
+  // ########################## Button ################################
+  // ----------------  primary ----------------
+  --button-primary-tx: #ffffff;
+  --button-primary-bg: var(--theme-primary-color);
+  --button-primary-bg-hovered: #215db0;
+  --button-primary-bg-pressed: #184a90;
+  --button-primary-bg-disable: rgba(45, 114, 210, 0.5);
+  --button-primary-tx-disable: hsla(0, 0%, 100%, 0.6);
+  // ----------------  positive ----------------
+  --button-positive-tx: #ffffff;
+  --button-positive-bg: #238551;
+  --button-positive-bg-hovered: #1c6e42;
+  --button-positive-bg-pressed: #165a36;
+  --button-positive-bg-disable: rgba(35, 133, 81, 0.5);
+  --button-positive-tx-disable: hsla(0, 0%, 100%, 0.6);
+  // ----------------  negative ----------------
+  --button-negative-tx: #ffffff;
+  --button-negative-bg: #cd4246;
+  --button-negative-bg-hovered: #ac2f33;
+  --button-negative-bg-pressed: #8e292c;
+  --button-negative-bg-disable: rgba(205, 66, 70, 0.5);
+  --button-negative-tx-disable: hsla(0, 0%, 100%, 0.6);
+  // ########################## Option ################################
+  --option-check: #0780ef;
+  --option-hovered: rgba(169, 169, 169, 0.15);
+  --option-pressed: rgba(161, 161, 161, 0.3);
+  --option-minimal-selected-tx: #0780ef;
+  --option-minimal-selected-bg: rgba(0, 133, 255, 0.1);
+  // ########################## Toaster ################################
+  --toaster-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  // ########################## Progress ################################
+  --progress-bg: rgba(95, 107, 124, 0.2);
+}

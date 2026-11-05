@@ -1,0 +1,34 @@
+{
+  "name": "@oxeo/server",
+  "version": "0.2.0",
+  "description": "Сервер oxeo: целостность схемы, журнал операций и договор драйвера, без конкретных драйверов и фреймворка",
+  "main": "dist/index.js",
+  "types": "./lib/index.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "echo": "echo \"@oxeo/server.\"",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "dev:browser": "vite --config vite.config.ts",
+    "test": "disableDev=true vitest run"
+  },
+  "dependencies": {
+    "@companix/utils-js": "latest",
+    "@oxeo/scheme": "file:../scheme",
+    "fast-deep-equal": "^3.1.3"
+  },
+  "devDependencies": {
+    "@oxeo/devkit": "file:../../tools/devkit",
+    "@oxeo-drivers/memory": "file:../../drivers/memory",
+    "@typescript-eslint/parser": "^5.62.0",
+    "eslint-config-react-app": "^7.0.1",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-react": "^7.34.3",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.0.0",
+    "vite-plugin-checker": "^0.9.3",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,52 @@
+// Записи таблицей внутри страницы: прокрутка по горизонтали — своя, по вертикали — страницы; колонки разделены
+// линиями, ячейка в строку с многоточием, кликабельная строка ведёт в запись.
+.records {
+  overflow-x: auto;
+  border: 1px solid var(--splitter-bg);
+  border-radius: 8px;
+
+  &-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+
+    th,
+    td {
+      max-width: 280px;
+      padding: 4px 8px;
+      overflow: hidden;
+      text-align: left;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    th {
+      border-bottom: 1px solid var(--splitter-bg);
+      background-color: var(--table-head-bg);
+      font-weight: 500;
+    }
+
+    th + th,
+    td + td {
+      border-left: 1px solid var(--splitter-bg);
+    }
+
+    tbody tr + tr td {
+      border-top: 1px solid var(--splitter-bg);
+    }
+
+    tbody tr:hover {
+      background-color: var(--row-bg-hovered);
+    }
+  }
+
+  &[data-clickable] tbody tr {
+    cursor: pointer;
+  }
+
+  &-empty {
+    padding: 12px 0;
+    color: var(--text-secondary);
+  }
+}

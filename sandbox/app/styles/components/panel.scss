@@ -1,0 +1,51 @@
+// Колонка экрана: шапка и пояснение не прокручиваются, прокручивается `.panel-scroll` внутри содержимого;
+// что шире колонки, обрезается её краем и не наезжает на соседнюю.
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 12px;
+  overflow: hidden;
+  border: 1px solid var(--splitter-bg);
+  border-radius: 8px;
+  background-color: var(--panel-bg);
+
+  &-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 28px;
+  }
+
+  &-title {
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  &-aside {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &-hint {
+    color: var(--text-secondary);
+    font-size: 13px;
+  }
+
+  &-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+  }
+
+  &-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
+}

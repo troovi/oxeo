@@ -1,0 +1,140 @@
+.theme-dark {
+  --theme-bg: #212121;
+  --theme-tx: #ffffff;
+  --theme-hint-color: #aaaaaa;
+  --theme-subhead-color: #969a9f;
+  --theme-secondary-bg-color: #0f0f0f;
+  --theme-secondary-hovered-bg-color: #1c1b1b;
+  --theme-secondary-pressed-bg-color: #242424;
+  // ########################## Button ################################
+  --button-shadow: inset 0 0 0 1px hsla(0, 0%, 100%, 0.1), 0 1px 2px rgba(17, 20, 24, 0.2);
+  --button-shadow-hovered: var(--button-shadow);
+  // ----------------  neutral ----------------
+  // default
+  --button-neutral-tx: #f6f7f9;
+  --button-neutral-bg: #333333;
+  --button-neutral-bg-hovered: #404040;
+  --button-neutral-bg-pressed: #505050;
+  --button-neutral-bg-disable: rgba(53, 53, 53, 0.15);
+  --button-neutral-tx-disable: rgba(184, 184, 184, 0.6);
+  // outline
+  --button-neutral-outline-border: hsla(0, 0%, 100%, 0.4);
+  --button-neutral-outline-border-disabled: hsla(0, 0%, 100%, 0.2);
+  --button-neutral-outline-bg-hovered: rgba(166, 166, 166, 0.15);
+  --button-neutral-outline-bg-pressed: rgba(162, 162, 162, 0.3);
+  // ----------------  primary ----------------
+  --button-primary-outline-tx: #8abbff;
+  --button-primary-outline-tx-disabled: rgba(138, 187, 255, 0.5);
+  --button-primary-outline-border: rgba(138, 187, 255, 0.6);
+  --button-primary-outline-border-disabled: rgba(138, 187, 255, 0.2);
+  --button-primary-outline-bg-hovered: rgba(45, 114, 210, 0.2);
+  --button-primary-outline-bg-pressed: rgba(45, 114, 210, 0.3);
+  --button-primary-outline-tx-pressed: #99c4ff;
+  // ----------------  positive ----------------
+  --button-positive-outline-tx: #72ca9b;
+  --button-positive-outline-border: rgba(114, 202, 155, 0.6);
+  --button-positive-outline-border-disabled: rgba(114, 202, 155, 0.2);
+  --button-positive-outline-bg-hovered: rgba(35, 133, 81, 0.2);
+  --button-positive-outline-bg-pressed: rgba(35, 133, 81, 0.3);
+  --button-positive-outline-tx-pressed: #7cd7a2;
+  --button-positive-outline-tx-disable: rgba(114, 202, 155, 0.5);
+  // ----------------  negative ----------------
+  --button-negative-outline-tx: #fa999c;
+  --button-negative-outline-border: rgba(250, 153, 156, 0.6);
+  --button-negative-outline-border-disabled: rgba(250, 153, 156, 0.2);
+  --button-negative-outline-bg-hovered: rgba(205, 66, 70, 0.2);
+  --button-negative-outline-bg-pressed: rgba(205, 66, 70, 0.3);
+  --button-negative-outline-tx-pressed: #ffa1a4;
+  --button-negative-outline-tx-disable: rgba(250, 153, 156, 0.5);
+  // ########################## Tooltip ################################
+  --tooltip-bg: #e5e8eb;
+  --tooltip-tx: #404854;
+  // ########################## Popover ################################
+  --popover-bg: #2c2d2e;
+  --popover-arrow-shadow: var(--popover-shadow);
+  --popover-shadow: 0 0 0 1px #5e6064, inset 0 0 0 1px hsla(0, 0%, 100%, 0.2),
+    0 2px 4px rgba(17, 20, 24, 0.4), 0 8px 24px rgba(17, 20, 24, 0.4);
+  // ########################## Dialog ################################
+  --dialog-bg: #1c1d1e;
+  --dialog-overlay-bg: rgba(0, 0, 0, 0.7);
+  --dialog-close-color: #cbcbcb;
+  --dialog-close-hovered-background: #99999933;
+  --dialog-close-pressed-background: #d9d9d933;
+  --dialog-shadow: inset 0 0 0 1px hsla(0, 0%, 100%, 0.2), 0 2px 4px rgba(17, 20, 24, 0.4),
+    0 8px 24px rgba(17, 20, 24, 0.4);
+  // ########################## Drawer ################################
+  --drawer-shadow: 0 2px 4px rgba(17, 20, 24, 0.4), 0 8px 24px rgba(17, 20, 24, 0.4);
+  // ########################## Form ################################
+  --form-tx: #f6f7f9;
+  --form-bg: #232324;
+  --form-shadow: 0 1px 2px rgba(79, 79, 79, 0.1);
+  --form-border: rgba(255, 255, 255, 0.152);
+  --form-bg-disabled: rgb(53, 53, 53);
+  --form-tx-disabled: rgba(171, 179, 191, 0.6);
+  --form-focus-border: rgba(39, 142, 246, 0.682);
+  --form-placeholder: var(--theme-hint-color);
+  // ########################## Form Group ################################
+  --form-group-tx: #f6f7f9;
+  // ########################## Select ################################
+  --select-tools-color: #99a2ad;
+  --select-tools-color-hovered: #777777;
+  // ########################## Tags ################################
+  --tags-bg: rgb(255 255 255 / 7%);
+  --tags-tx: #ffffff;
+  --tags-border: #646464;
+  --tags-close: #969696;
+  --tags-close-hovered: #ffffff;
+  // ########################## Avatar ################################
+  --avatar-bg: #232324;
+  --avatar-tx: #76787a;
+  --avatar-border: rgba(255, 255, 255, 0.08);
+  // ########################## Segment ################################
+  --segment-container-bg: #232324;
+  --segment-slider-bg: #626364;
+  --segment-option-hovered: rgba(158, 158, 158, 0.15);
+  --segment-option-pressed: rgba(73, 73, 73, 0.3);
+  // ########################## Spinner ################################
+  --spinner-tx: rgba(255, 255, 255, 0.25);
+  // ########################## Skeleton ################################
+  --skeleton-from-bg: #232324;
+  --skeleton-to-bg: #2c2d2e;
+  // ########################## WriteBar ################################
+  --write-bar-bg: #2c2d2e;
+  --write-bar-icon: #76787a;
+  // ########################## Calendar ################################
+  --calendar-day-hovered: rgba(255, 255, 255, 0.1);
+  --calendar-day-disable: #5d5f61;
+  // ########################## Checkbox ################################
+  --checkbox-tx: rgb(243, 244, 245);
+  --checkbox-bg: #b5b7c040;
+  --checkbox-bg-hovered: #c4c6d040;
+  --checkbox-bg-pressed: #b5b7c040;
+  --checkbox-bg-checked: #ffdb4d;
+  --checkbox-mark-bg: #242429;
+  // ########################## Radio ################################
+  --radio-mark-bg: #242429;
+  // ########################## Tabs ################################
+  --tab-underlib: #ffffff12;
+  --tab-hovered: #828282;
+  --tab-tx: #717171;
+  // ########################## Toaster ################################
+  --toaster-close: #ffffff5a;
+  --toaster-close-hovered: hsl(0, 0%, 100%);
+  // primary
+  --toaster-primary-bg: hsl(208deg 40.01% 8.99%);
+  --toaster-primary-border: hsl(210deg 92% 45% / 26%);
+  // neutral
+  --toaster-neutral-border: hsla(0, 0%, 100%, 0.16);
+  // negative
+  --toaster-negative-bg: hsl(359deg 29.46% 7.06%);
+  --toaster-negative-border: hsl(359deg 100% 24.94%);
+  // positive
+  --toaster-positive-bg: hsl(143deg 21.29% 8.97%);
+  --toaster-positive-border: hsl(140deg 100% 31.9% / 54%);
+  // warning
+  --toaster-warning-bg: hsl(49deg 20.98% 6.01%);
+  --toaster-warning-border: hsl(49deg 100% 45.5% / 60%);
+  // ########################## Switch ################################
+  --switch-uncheck-bg: #2d2d2d;
+  --switch-thumb-bg: #ffffff;
+}
