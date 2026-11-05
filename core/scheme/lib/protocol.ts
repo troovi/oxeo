@@ -62,11 +62,9 @@ export type QueryResult = QueryResults.Records | QueryResults.Count
 
 /**
  * Ответ на пакет. Записи — и те, что подошли под запросы, и захваченные по ссылкам на один уровень, каждая один раз;
- * результаты — по порядку запросов пакета; ревизия — на которой сервер снял ответ в очереди журнала.
+ * результаты — по порядку запросов пакета.
  */
 export interface QueryAnswer {
-  epoch: string
-  revision: number
   records: RecordVersion[]
   results: QueryResult[]
 }

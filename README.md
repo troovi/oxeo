@@ -205,7 +205,8 @@ export const NotePage = observer(({ noteId }: { noteId: number }) => {
 await DomainsAPI.notes.add({ text, authorId })
 ```
 
-Поток событий открывает приложение и передаёт сообщения в `client.push` и `client.resync`.
+Поток событий открывает приложение и передаёт сообщения в `client.push` и `client.resync`. После обрыва потока
+приложение вызывает `client.resync`: события за время обрыва потеряны.
 
 ## Пакеты
 
@@ -216,7 +217,7 @@ await DomainsAPI.notes.add({ text, authorId })
 | ---------------- | ----------------------------- | ------------------------------------------------------------------------------------ | ---------------------------- |
 | `core/scheme`    | `@oxeo/scheme`        | декораторы, `DataScheme`, `schemaOf`, контракт доменов и коллекций, фильтр, протокол | `core`; клиент — только типы |
 | `core/server`    | `@oxeo/server`        | `DataSource`, `DataProcessor`, журнал `createServerShell`, договор драйвера          | сервер                       |
-| `core/client`    | `@oxeo/client`        | живая часть базы, чтения, пакеты запросов, очередь событий, вызовы операций          | клиент                       |
+| `core/client`    | `@oxeo/client`        | живая часть базы, чтения, пакеты запросов, события журнала, вызовы операций          | клиент                       |
 | `core/react`     | `@oxeo/react`         | `createObserver`, `createUseData`                                                    | клиент на React              |
 | `core/types`     | `@oxeo/types`         | типы HTTP-маршрутов и файлов                                                         | приложения                   |
 | `drivers/mongo`  | `@oxeo-drivers/mongo`  | драйвер MongoDB, модуль NestJS                                                       | сервер                       |

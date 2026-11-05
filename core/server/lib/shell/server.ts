@@ -1,8 +1,8 @@
 /**
  * Серверная сторона — журнал событий. Вызовы выполняются строго по одному: актор, момент и идентификаторы — в контексте,
  * событие получает ревизию, новые версии записей, которые тронула операция, и уходит всем клиентам. Пакеты запросов
- * клиентов выполняются в той же очереди, поэтому ревизия ответа точна. Транспорт, авторизацию и часовой пояс задаёт
- * приложение через опции; фреймворк (NestJS и т. п.) остаётся снаружи.
+ * клиентов идут мимо очереди вызовов. Транспорт, авторизацию и часовой пояс задаёт приложение через опции; фреймворк
+ * (NestJS и т. п.) остаётся снаружи.
  */
 import { hash, QueueManager } from '@companix/utils-js'
 import { DomainError } from '@oxeo/scheme'
@@ -16,7 +16,6 @@ import type {
   EventContext,
   IType,
   Query,
-  QueryAnswer,
   QueryBatch,
   QueryResult,
   RecordVersion
@@ -213,22 +212,21 @@ export const createServerShell = <
   type Answer = ReturnType<typeof createAnswer>
 
   /**
-   * Пакет запросов клиента — в очереди журнала, между вызовами: ревизия ответа точна. Сначала каждый запрос пакета,
-   * затем захват записей, на которые ведут ссылки отданных записей, на один уровень.
+   * Пакет запросов клиента — мимо очереди вызовов, поэтому чтение может застать операцию на середине: итоговые версии
+   * принесёт её событие. Сначала каждый запрос пакета, затем захват записей, на которые ведут ссылки отданных записей,
+   * на один уровень.
    */
-  const query = ({ queries }: QueryBatch) => {
-    return queue.add(async (): Promise<QueryAnswer> => {
-      const answer = createAnswer()
-      const results: QueryResult[] = []
+  const query = async ({ queries }: QueryBatch) => {
+    const answer = createAnswer()
+    const results: QueryResult[] = []
 
-      for (const item of queries) {
-        results.push(await resolve(item, answer))
-      }
+    for (const item of queries) {
+      results.push(await resolve(item, answer))
+    }
 
-      await capture(answer)
+    await capture(answer)
 
-      return { epoch, revision, records: [...answer.versions.values()], results }
-    })
+    return { records: [...answer.versions.values()], results }
   }
 
   /** Один запрос пакета: записи — в ответ, результат — их id или число. */

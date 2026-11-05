@@ -125,7 +125,7 @@ export class JournalService implements OnModuleInit {
     return run({ domain, method, params: parsed.data }, identity)
   }
 
-  /** Пакет запросов клиента — в очереди журнала; ответ — записи с захватом ссылок и ревизия. */
+  /** Пакет запросов клиента; ответ — записи с захватом ссылок и результаты запросов. */
   query(batch: QueryBatch) {
     if (!Array.isArray(batch?.queries)) {
       throw new BadRequestException({ code: 'params', message: 'Пакет запросов — { queries: [...] }' })

@@ -125,7 +125,6 @@ describe('createServerShell', () => {
       ]
     })
 
-    expect(answer.revision).toBe(5)
     expect(answer.results).toEqual([{ ids: [1] }, { ids: [2] }, { count: 1 }, { count: 2 }])
 
     // записи запросов и захваченные авторы — каждая один раз

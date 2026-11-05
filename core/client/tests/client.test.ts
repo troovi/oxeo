@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
-import type { DomainEvent } from '@oxeo/scheme'
+import { describe, expect, it } from 'vitest'
+import type { DomainEvent, RecordVersion } from '@oxeo/scheme'
 import { clone, createJournal, domains, tick, type Scheme } from '../../server/tests/journal.fixture'
-import { ClientChange, EventSync, Tracker, UncoveredReadError, createClient } from '../lib'
+import { ClientChange, Tracker, UncoveredReadError, createClient } from '../lib'
 
 /** Клиент над журналом: пакеты и вызовы — через копию, как по сети; поток — по подписке. */
 const connectClient = (
@@ -208,62 +208,90 @@ describe('Tracker', () => {
   })
 })
 
-describe('EventSync', () => {
-  const event = (revision: number, epoch = 'e1'): DomainEvent => ({
+describe('поток и ответ вызова', () => {
+  const note = (noteId: number, text: string): RecordVersion => ({
+    collection: 'note',
+    id: noteId,
+    record: { noteId, text, status: 'draft', createdAt: 0, authorId: 1 }
+  })
+
+  const event = (revision: number, changes: RecordVersion[], epoch = 'e1'): DomainEvent => ({
     epoch,
     revision,
-    domain: 'd',
-    method: 'm',
+    domain: 'notes',
+    method: 'publish',
     params: {},
     ctx: { actor: null, at: 0, today: '2026-01-01' },
     result: null,
-    changes: []
+    changes
   })
 
-  it('применяет по порядку, глушит дубли и ждёт разрыв', async () => {
-    const applied: number[] = []
-    const resync = vi.fn()
-    const sync = new EventSync({
-      apply: async (e) => {
-        applied.push(e.revision)
+  /** Клиент над управляемым транспортом: заметки 1 и 2 загружены, ответ вызова отдаёт `pending.answer`. */
+  const connect = async (onResync?: (reason: string) => void) => {
+    const pending = { answer: (_: DomainEvent) => {} }
+    const client = createClient<Scheme, typeof domains>({
+      transport: {
+        query: async () => ({ records: [note(1, 'a'), note(2, 'b')], results: [{ ids: [1, 2] }] }),
+        call: () => {
+          return new Promise((resolve) => {
+            pending.answer = resolve
+          })
+        }
       },
-      resync,
-      gapTimeout: 50
+      retries: [],
+      onResync
     })
 
-    sync.push(event(3))
-    sync.push(event(2))
-    expect(sync.isStarted).toBe(false)
-    sync.start({ epoch: 'e1', revision: 1 })
-    expect(sync.startedEpoch).toBe('e1')
-    sync.push(event(2))
-    await sync.whenApplied(3)
-    expect(applied).toEqual([2, 3])
-    expect(resync).not.toHaveBeenCalled()
+    await client.data.note.load()
 
-    sync.push(event(5))
-    await tick(80)
-    expect(resync).toHaveBeenCalledWith('gap')
+    return { client, pending }
+  }
+
+  it('ответ вызова опоздал: поток дошёл дальше, и старая версия не затирает новую', async () => {
+    const { client, pending } = await connect()
+    const called = client.DomainsAPI.notes.publish({ noteId: 1 })
+
+    client.push(event(1, [note(1, 'своя')]))
+    client.push(event(2, [note(1, 'новее')]))
+    pending.answer(event(1, [note(1, 'своя')]))
+
+    await called
+
+    expect(client.data.note.get(1)?.text).toBe('новее')
   })
 
-  it('смена эпохи и ошибка применения ведут к пересинхронизации', async () => {
-    const resync = vi.fn()
-    const sync = new EventSync({
-      apply: async () => {
-        throw new Error('boom')
-      },
-      resync
-    })
+  it('ответ вызова обогнал поток: своя версия — сразу, чужое событие не теряется', async () => {
+    const { client, pending } = await connect()
 
-    sync.start({ epoch: 'e1', revision: 0 })
-    const waiting = sync.whenApplied(1)
-    sync.push(event(1))
-    await expect(waiting).rejects.toThrow('boom')
-    expect(resync).toHaveBeenCalledWith('apply')
+    client.push(event(1, []))
 
-    const other = new EventSync({ apply: async () => undefined, resync })
-    other.start({ epoch: 'e1', revision: 0 })
-    other.push(event(1, 'e2'))
-    expect(resync).toHaveBeenLastCalledWith('epoch')
+    const called = client.DomainsAPI.notes.publish({ noteId: 1 })
+
+    pending.answer(event(3, [note(1, 'своя')]))
+
+    await called
+
+    expect(client.data.note.get(1)?.text).toBe('своя')
+
+    client.push(event(2, [note(1, 'чужая'), note(2, 'чужая')]))
+    client.push(event(3, [note(1, 'своя')]))
+
+    expect(client.data.note.get(1)?.text).toBe('своя')
+    expect(client.data.note.get(2)?.text).toBe('чужая')
+  })
+
+  it('разрыв ревизий и смена эпохи ведут к пересинхронизации', async () => {
+    const reasons: string[] = []
+    const { client } = await connect((reason) => reasons.push(reason))
+
+    client.push(event(1, []))
+    client.push(event(3, []))
+
+    expect(reasons).toEqual(['stream'])
+
+    client.push(event(1, []))
+    client.push(event(2, [], 'e2'))
+
+    expect(reasons).toEqual(['stream', 'stream'])
   })
 })
