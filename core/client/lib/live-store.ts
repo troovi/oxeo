@@ -16,6 +16,7 @@ import type {
   QueryResult,
   RecordVersion
 } from '@oxeo/scheme'
+import { globalState } from './global-state'
 import { ClientChange, Tracker, emptyChange } from './tracker'
 
 // types
@@ -170,7 +171,7 @@ export class LiveStore {
    * уже не удался) и отдать пустое; записи — через прокси сборщика. Вне рендера — только покрытое.
    */
   read(query: Query) {
-    const tracker = Tracker.current
+    const tracker = globalState.currentTracker
 
     if (tracker === null) {
       return this.readCovered(query)

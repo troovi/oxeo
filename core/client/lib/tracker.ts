@@ -1,8 +1,19 @@
 /**
- * Сборщик одного прохода рендера: что тело прочитало (для подписки) и чего не хватило (для загрузки). Привязка к
- * фреймворку (`@oxeo/react`) ставит его на время прохода; чтения клиента видят его через `Tracker.current`.
+ * Сборщик прохода рендера: что тело прочитало (для подписки) и чего не хватило (для загрузки). Сборщик один на
+ * компонент, каждый проход заполняет его заново. Фреймворка он не знает: создаёт его и подписывает привязка
+ * (`@oxeo/react`).
+ *
+ * Работа сборщика по шагам:
+ *
+ * 1. Проход. `run` забывает прошлый проход и на время тела ставит сборщик в `globalState.currentTracker`.
+ * 2. Чтение. `data.<collection>` видит текущий сборщик: запоминает прочитанное, отдаёт запись через прокси, который
+ *    запоминает поля, а недостающее кладёт в `needs`.
+ * 3. Загрузка. Привязка отправляет `needs` одним пакетом и повторяет проход, когда ответ придёт.
+ * 4. Изменение. Событие или ответ меняют данные клиента, и он рассылает `ClientChange` всем подписчикам.
+ * 5. Фильтр. `isAffected` сверяет изменение с прочитанным. Не касается — компонент не трогаем, касается — новый проход.
  */
 import type { Query } from '@oxeo/scheme'
+import { globalState } from './global-state'
 
 /** Что изменилось у клиента — по этому привязка решает, кого перерисовать. */
 export interface ClientChange {
@@ -21,9 +32,6 @@ export const emptyChange = (): ClientChange => {
 }
 
 export class Tracker {
-  /** Сборщик прохода, который идёт сейчас; `null` — чтение вне рендера. */
-  static current: Tracker | null = null
-
   /** Запросы, которых у клиента нет, — их загрузит привязка. */
   readonly needs = new Map<string, Query>()
   /** Запросы, загрузка которых не удалась после повторов. */
@@ -35,14 +43,11 @@ export class Tracker {
   /** Коллекции, прочитанные из загруженных целиком. */
   readonly collections = new Set<string>()
 
-  /** Снимок подписки: растёт с каждым изменением прочитанного. */
-  version = 0
-
   private proxies = new WeakMap<object, object>()
 
   /** Проход: всё прочитанное прошлым проходом забывается, сборщик становится текущим на время `body`. */
   run<R>(body: () => R) {
-    const prev = Tracker.current
+    const prev = globalState.currentTracker
 
     this.needs.clear()
     this.failures.clear()
@@ -51,12 +56,12 @@ export class Tracker {
     this.collections.clear()
     this.proxies = new WeakMap()
 
-    Tracker.current = this
+    globalState.currentTracker = this
 
     try {
       return body()
     } finally {
-      Tracker.current = prev
+      globalState.currentTracker = prev
     }
   }
 
@@ -122,16 +127,5 @@ export class Tracker {
     }
 
     return false
-  }
-
-  /** Снимок подписки для `useSyncExternalStore` — и на клиенте, и при серверном рендере. */
-  snapshot = () => {
-    return this.version
-  }
-
-  /** Новый снимок подписки и уведомление фреймворка. */
-  bump(onChange?: () => void) {
-    this.version += 1
-    onChange?.()
   }
 }

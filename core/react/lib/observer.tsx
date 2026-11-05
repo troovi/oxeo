@@ -2,12 +2,8 @@
  * Обёртка `observer` — привязка клиента oxeo к React. Внутри у неё свои границы ошибок и Suspense, поэтому приложению их
  * расставлять не нужно: заглушка загрузки и вид ошибки — опции обёртки с умолчаниями, заданными один раз.
  */
-import { Component, Suspense, useState, useSyncExternalStore } from 'react'
-import { Tracker } from '@oxeo/client'
-import type { OxeoClient } from '@oxeo/client'
-
-/** Клиент глазами привязки: загрузка потребностей прохода, отказы, подписка на изменения. */
-export type BindingClient = Pick<OxeoClient, 'request' | 'forgetFailures' | 'subscribe'>
+import { Component, Suspense } from 'react'
+import { BindingClient, useTracker } from './use-tracker'
 
 export interface ObserverViews {
   /** Пока догружается то, что тело прочитало. */
@@ -66,10 +62,7 @@ interface TrackedProps<P> {
  * React отбрасывает целиком, поэтому счёт хуков не расходится.
  */
 const Tracked = <P,>({ client, body, props }: TrackedProps<P>) => {
-  const [tracker] = useState(() => new Tracker())
-  const [subscribe] = useState(() => subscriberOf(client, tracker))
-
-  useSyncExternalStore(subscribe, tracker.snapshot, tracker.snapshot)
+  const tracker = useTracker(client)
 
   const pass = tracker.run(() => {
     try {
@@ -92,17 +85,6 @@ const Tracked = <P,>({ client, body, props }: TrackedProps<P>) => {
   }
 
   return <>{pass.output}</>
-}
-
-/** Подписка для `useSyncExternalStore`: новый снимок — только на изменения прочитанного проходом. */
-export const subscriberOf = (client: BindingClient, tracker: Tracker) => {
-  return (onChange: () => void) => {
-    return client.subscribe((change) => {
-      if (tracker.isAffected(change)) {
-        tracker.bump(onChange)
-      }
-    })
-  }
 }
 
 /** Пакет не удался после повторов: ключи запросов, которые надо повторить. */

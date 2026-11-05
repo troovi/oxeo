@@ -2,9 +2,8 @@
  * Мост для кода, который вызывают чужие компоненты: `useOptions` поля formkit, колбэки списков uikit. Хозяин такого кода
  * не в обёртке `observer`, поэтому чтение идёт через хук.
  */
-import { useEffect, useState, useSyncExternalStore } from 'react'
-import { Tracker } from '@oxeo/client'
-import { BindingClient, subscriberOf } from './observer'
+import { useEffect, useState } from 'react'
+import { BindingClient, useTracker } from './use-tracker'
 
 /**
  * Хук-мост: функция выполняется со своим сборщиком в компоненте-хозяине — хозяин подписывается на прочитанное,
@@ -20,11 +19,8 @@ import { BindingClient, subscriberOf } from './observer'
  */
 export const createUseData = (client: BindingClient) => {
   return <R>(read: () => R) => {
-    const [tracker] = useState(() => new Tracker())
-    const [subscribe] = useState(() => subscriberOf(client, tracker))
+    const tracker = useTracker(client)
     const [, setFailures] = useState(0)
-
-    useSyncExternalStore(subscribe, tracker.snapshot, tracker.snapshot)
 
     const value = tracker.run(read)
     const needs = [...tracker.needs.values()]
