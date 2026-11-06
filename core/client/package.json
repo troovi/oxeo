@@ -2,6 +2,11 @@
   "name": "@oxeo/client",
   "version": "0.2.0",
   "description": "Клиент oxeo: живая часть базы сервера, чтения, пакеты запросов, очередь событий и вызовы операций",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/troovi/oxeo.git",
+    "directory": "core/client"
+  },
   "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",
   "types": "./lib/index.ts",

@@ -2,6 +2,11 @@
   "name": "@oxeo/scheme",
   "version": "0.2.0",
   "description": "Схема данных и контракт доменов oxeo: то, на чём пишется общий core проекта",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/troovi/oxeo.git",
+    "directory": "core/scheme"
+  },
   "main": "dist/bundle.cjs.js",
   "module": "dist/bundle.esm.js",
   "types": "./lib/index.ts",

@@ -1,5 +1,4 @@
 name: publish-packages
-# Публикация выключена: push workflow не запускает. Включить — вернуть вместо workflow_dispatch:
 on:
   push:
     branches:

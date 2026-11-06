@@ -1,6 +1,11 @@
 {
   "name": "@oxeo/react",
   "version": "0.2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/troovi/oxeo.git",
+    "directory": "core/react"
+  },
   "module": "dist/bundle.esm.js",
   "types": "./lib/index.ts",
   "files": [

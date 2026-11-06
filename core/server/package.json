@@ -2,6 +2,11 @@
   "name": "@oxeo/server",
   "version": "0.2.0",
   "description": "Сервер oxeo: целостность схемы, рантайм доменов и договор драйвера, без конкретных драйверов и фреймворка",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/troovi/oxeo.git",
+    "directory": "core/server"
+  },
   "main": "dist/index.js",
   "types": "./lib/index.ts",
   "files": [

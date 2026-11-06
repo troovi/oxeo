@@ -2,6 +2,11 @@
   "name": "@oxeo/visual",
   "version": "0.2.0",
   "description": "Интерактивная карта схемы данных oxeo: модели, поля, embedded-блоки и связи по исходникам схемы.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/troovi/oxeo.git",
+    "directory": "tools/visual"
+  },
   "main": "dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {

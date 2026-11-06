@@ -2,6 +2,11 @@
   "name": "@oxeo-drivers/memory",
   "version": "0.2.0",
   "description": "Драйвер @oxeo/server в памяти процесса: для тестов доменов и песочниц",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/troovi/oxeo.git",
+    "directory": "drivers/memory"
+  },
   "main": "dist/index.js",
   "types": "./lib/index.ts",
   "files": [
