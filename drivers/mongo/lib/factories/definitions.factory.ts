@@ -116,8 +116,10 @@ export class DefinitionsFactory<T extends CollectionScheme> {
         }
       }
       case 'belongs-to': {
+        // ключ родителя — фильтр каждого чтения дочерних записей (`find({ <parent>Id })`), поэтому индекс всегда
         return {
           type: TypesTranslator[refModel.identifier.options.type],
+          index: true,
           required: true
         }
       }

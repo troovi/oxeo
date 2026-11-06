@@ -252,6 +252,9 @@ runtime.query(batch, identity)
 (`MongooseDriverModule`, `InjectDataSource`), `@oxeo-drivers/memory` держит их в памяти процесса: он нужен тестам
 доменов и песочницам.
 
+Индексы Mongo задаёт схема: `index: true` у `@Prop` и `@ReferenceTo` — под поля, по которым идут выборки. Ключ
+родителя `BelongsTo` индексируется всегда: по нему читаются дочерние записи.
+
 ## client
 
 Клиент собирается из типов `core` и транспорта. В рантайме от `core` ему ничего не нужно.
