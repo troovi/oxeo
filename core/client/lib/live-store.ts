@@ -54,15 +54,14 @@ interface FindEntry {
 }
 
 interface CountEntry {
-  collection: string
-  where: object | null
+  query: Queries.Count
   value: number
 }
 
-interface Deferred {
-  promise: Promise<void>
-  resolve: () => void
-  reject: (error: unknown) => void
+/** Запросы, которые уйдут одним пакетом в конце такта; `done` — его итог. */
+interface NextBatch {
+  queries: Map<string, Query>
+  done: Promise<void>
 }
 
 interface ApplyResultParams {
@@ -71,16 +70,17 @@ interface ApplyResultParams {
   change: ClientChange
 }
 
-/** Записи по id внутри коллекции. */
+/** Запись вместе с id: схемы у клиента нет, и какое поле записи — id, он не знает. */
 type RecordEntry = [IType, object]
 
 export class LiveStore {
   // store
 
-  /** Версии записей по коллекциям; версия неизменяема — новая кладётся новым объектом. */
-  private records = new Map<string, Map<IType, object>>()
-  /** Известно, что записи нет: сервер её не нашёл или событие её удалило — `collection:id`. */
-  private absent = new Set<string>()
+  /**
+   * Версии записей по коллекциям; версия неизменяема — новая кладётся новым объектом. `null` — известно, что записи нет:
+   * сервер её не нашёл или событие её удалило.
+   */
+  private records = new Map<string, Map<IType, object | null>>()
   /** Коллекции, загруженные целиком: любой запрос к ним отвечается на месте. */
   private complete = new Set<string>()
   /** Живые запросы по ключу. */
@@ -92,11 +92,9 @@ export class LiveStore {
 
   // loading
 
-  /** Потребности, ещё не отправленные: уходят одним пакетом в конце такта. */
-  private waiting = new Map<string, { query: Query; done: Deferred }>()
-  /** Отправленные и ещё не отвеченные: повторная потребность ждёт их, а не шлёт снова. */
+  private nextBatch: NextBatch | null = null
+  /** Запросы в пути, отправленные и ещё нет: повторная потребность ждёт их, а не шлёт снова. */
   private inflight = new Map<string, Promise<void>>()
-  private isFlushScheduled = false
   private countTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
   // stream
@@ -142,26 +140,24 @@ export class LiveStore {
   /** Записи покрытого `find`: по живому запросу или отбором из коллекции, загруженной целиком. */
   private entriesOf(query: Queries.Find): RecordEntry[] {
     const entry = this.finds.get(keyOf(query))
-    const collection = this.records.get(query.collection) ?? new Map<IType, object>()
+    const records = this.records.get(query.collection) ?? new Map<IType, object | null>()
 
     if (entry) {
-      return [...entry.ids].map((id): RecordEntry => [id, collection.get(id)!])
+      return [...entry.ids].map((id): RecordEntry => [id, records.get(id)!])
     }
 
-    const all = [...collection.entries()]
-
-    return query.where === null ? all : all.filter(([, record]) => matches(record, query.where!))
+    return [...records].filter((item): item is RecordEntry => {
+      return item[1] !== null && matches(item[1], query.where ?? {})
+    })
   }
 
-  /** Число покрытого `count`: по живому счётчику или отбором из коллекции, загруженной целиком. */
+  /** Число покрытого `count`: отбором из коллекции, загруженной целиком, иначе — по живому счётчику. */
   private countOf(query: Queries.Count) {
-    const entry = this.counts.get(keyOf(query))
-
-    if (entry) {
-      return entry.value
+    if (this.complete.has(query.collection)) {
+      return this.entriesOf({ ...query, kind: 'find' }).length
     }
 
-    return this.entriesOf({ kind: 'find', collection: query.collection, where: query.where }).length
+    return this.counts.get(keyOf(query))!.value
   }
 
   // reads
@@ -173,28 +169,42 @@ export class LiveStore {
   read(query: Query) {
     const tracker = globalState.currentTracker
 
+    if (tracker) {
+      this.watch(tracker, query)
+    }
+
+    if (this.isCovered(query)) {
+      return this.valueOf(query, tracker)
+    }
+
     if (tracker === null) {
-      return this.readCovered(query)
+      throw new UncoveredReadError(keyOf(query))
     }
 
     const key = keyOf(query)
 
-    this.watch(tracker, query)
+    if (this.failures.has(key)) {
+      tracker.failures.add(key)
+    }
 
-    if (!this.isCovered(query)) {
-      if (this.failures.has(key)) {
-        tracker.failures.add(key)
-        return emptyOf(query)
-      }
-
+    if (!this.failures.has(key)) {
       tracker.needs.set(key, query)
-      return emptyOf(query)
+    }
+
+    return query.kind === 'get' ? null : query.kind === 'count' ? 0 : []
+  }
+
+  /** Значение покрытого запроса; в проходе рендера записи идут через прокси сборщика. */
+  private valueOf(query: Query, tracker: Tracker | null) {
+    const track = (id: IType, record: object) => {
+      return tracker ? tracker.track(`${query.collection}:${id}`, record) : record
     }
 
     if (query.kind === 'get') {
-      const record = this.recordOf(query.collection, query.ids[0])
+      const [id] = query.ids
+      const record = this.records.get(query.collection)?.get(id) ?? null
 
-      return record && tracker.track(`${query.collection}:${query.ids[0]}`, record)
+      return record && track(id, record)
     }
 
     if (query.kind === 'count') {
@@ -203,7 +213,7 @@ export class LiveStore {
 
     const entries = this.entriesOf(query)
 
-    return entries.map(([id, record]) => tracker.track(`${query.collection}:${id}`, record))
+    return entries.map(([id, record]) => track(id, record))
   }
 
   /** Явная загрузка для обработчика: непокрытое — с сервера, покрытое — сразу. */
@@ -212,24 +222,7 @@ export class LiveStore {
       await this.request([query])
     }
 
-    return this.readCovered(query) as object[]
-  }
-
-  /** Чтение вне рендера: только покрытое. */
-  private readCovered(query: Query) {
-    if (!this.isCovered(query)) {
-      throw new UncoveredReadError(keyOf(query))
-    }
-
-    if (query.kind === 'get') {
-      return this.recordOf(query.collection, query.ids[0])
-    }
-
-    if (query.kind === 'count') {
-      return this.countOf(query)
-    }
-
-    return this.entriesOf(query).map(([, record]) => record)
+    return this.read(query) as object[]
   }
 
   /** Запомнить в сборщике, от чего зависит проход: запись, состав запроса, коллекция целиком. */
@@ -240,10 +233,7 @@ export class LiveStore {
     }
 
     tracker.queries.add(keyOf(query))
-
-    if (query.where === null || this.complete.has(query.collection)) {
-      tracker.collections.add(query.collection)
-    }
+    tracker.collections.add(query.collection)
   }
 
   // loading
@@ -252,24 +242,28 @@ export class LiveStore {
   async request(queries: Query[]) {
     const promises = queries.map((query) => {
       const key = keyOf(query)
-      const current = this.inflight.get(key) ?? this.waiting.get(key)?.done.promise
+      const current = this.inflight.get(key)
 
       if (current) {
         return current
       }
 
-      const done = createDeferred()
+      this.nextBatch ??= this.createBatch()
+      this.nextBatch.queries.set(key, query)
+      this.inflight.set(key, this.nextBatch.done)
 
-      this.waiting.set(key, { query, done })
-      return done.promise
+      return this.nextBatch.done
     })
 
-    if (!this.isFlushScheduled) {
-      this.isFlushScheduled = true
-      setTimeout(() => this.flush(), 0)
-    }
-
     await Promise.all(promises)
+  }
+
+  /** Новый пакет: копит запросы до конца такта, затем уходит. */
+  private createBatch() {
+    const queries = new Map<string, Query>()
+    const tick = new Promise((resolve) => setTimeout(resolve, 0))
+
+    return { queries, done: tick.then(() => this.flush(queries)) }
   }
 
   /** Забыть отказ запросов перед повтором: следующий проход снова соберёт их как потребности. */
@@ -278,31 +272,22 @@ export class LiveStore {
   }
 
   /** Отправка накопленного одним пакетом; `get` одной коллекции склеиваются в один список id. */
-  private async flush() {
-    const items = [...this.waiting.values()]
-    const batch: QueryBatch = { queries: mergeGets(items.map((item) => item.query)) }
+  private async flush(queries: Map<string, Query>) {
+    const keys = [...queries.keys()]
+    const batch: QueryBatch = { queries: mergeGets([...queries.values()]) }
 
-    this.waiting.clear()
-    this.isFlushScheduled = false
-
-    items.forEach((item) => this.inflight.set(keyOf(item.query), item.done.promise))
+    this.nextBatch = null
 
     try {
       const answer = await withRetries(() => this.transport.query(batch), this.retries)
 
       this.applyAnswer(batch, answer)
-
-      items.forEach((item) => {
-        this.failures.delete(keyOf(item.query))
-        item.done.resolve()
-      })
+      keys.forEach((key) => this.failures.delete(key))
     } catch (error) {
-      items.forEach((item) => {
-        this.failures.add(keyOf(item.query))
-        item.done.reject(error)
-      })
+      keys.forEach((key) => this.failures.add(key))
+      throw error
     } finally {
-      items.forEach((item) => this.inflight.delete(keyOf(item.query)))
+      keys.forEach((key) => this.inflight.delete(key))
     }
   }
 
@@ -324,17 +309,14 @@ export class LiveStore {
 
     if (query.kind === 'get' && 'ids' in result) {
       const missing = query.ids.filter((id) => !result.ids.includes(id))
+      const unknown = missing.filter((id) => !this.isKnown(query.collection, id))
 
-      missing.forEach((id) => {
-        this.absent.add(`${query.collection}:${id}`)
-        change.records.set(`${query.collection}:${id}`, null)
-      })
-
+      unknown.forEach((id) => this.put({ collection: query.collection, id, record: null }, change))
       return
     }
 
     if (query.kind === 'count' && 'count' in result) {
-      this.counts.set(key, { collection: query.collection, where: query.where, value: result.count })
+      this.counts.set(key, { query, value: result.count })
       change.queries.add(key)
       return
     }
@@ -452,8 +434,8 @@ export class LiveStore {
   private async refreshCounts(collection: string) {
     this.countTimers.delete(collection)
 
-    const entries = [...this.counts.values()].filter((entry) => entry.collection === collection)
-    const queries: Query[] = entries.map((entry) => ({ kind: 'count', collection, where: entry.where }))
+    const entries = [...this.counts.values()].filter((entry) => entry.query.collection === collection)
+    const queries = entries.map((entry) => entry.query)
 
     if (queries.length === 0) {
       return
@@ -478,7 +460,6 @@ export class LiveStore {
    */
   resync(reason: string) {
     this.records.clear()
-    this.absent.clear()
     this.complete.clear()
     this.finds.clear()
     this.counts.clear()
@@ -508,38 +489,23 @@ export class LiveStore {
     this.listeners.forEach((listener) => listener(change))
   }
 
-  private recordOf(collection: string, id: IType) {
-    return this.records.get(collection)?.get(id) ?? null
-  }
-
   /** Запись есть у клиента или известно, что её нет. */
   private isKnown(collection: string, id: IType) {
-    return this.recordOf(collection, id) !== null || this.absent.has(`${collection}:${id}`)
+    return this.records.get(collection)?.has(id) ?? false
   }
 
   /** Версия записи на место прежней; какие поля изменились — для подписок. */
   private put({ collection, id, record }: RecordVersion, change: ClientChange) {
-    const prev = this.recordOf(collection, id)
-    const key = `${collection}:${id}`
+    const records = this.records.get(collection) ?? new Map<IType, object | null>()
+    const prev = records.get(id) ?? null
+
+    records.set(id, record)
+    this.records.set(collection, records)
+    change.records.set(`${collection}:${id}`, prev && record && changedFields(prev, record))
 
     if (this.complete.has(collection)) {
       change.collections.add(collection)
     }
-
-    if (record === null) {
-      this.records.get(collection)?.delete(id)
-      this.absent.add(key)
-      change.records.set(key, null)
-      return
-    }
-
-    if (!this.records.has(collection)) {
-      this.records.set(collection, new Map())
-    }
-
-    this.records.get(collection)!.set(id, record)
-    this.absent.delete(key)
-    change.records.set(key, prev === null ? null : changedFields(prev, record))
   }
 }
 
@@ -551,33 +517,7 @@ const keyOf = (query: Query) => {
     return `get:${query.collection}:${query.ids.join(',')}`
   }
 
-  return `${query.kind}:${query.collection}:${stableStringify(query.where)}`
-}
-
-const emptyOf = (query: Query) => {
-  if (query.kind === 'get') {
-    return null
-  }
-
-  return query.kind === 'count' ? 0 : []
-}
-
-/** JSON с ключами по алфавиту: одинаковый фильтр с разным порядком полей — один ключ. */
-const stableStringify = (value: unknown): string => {
-  if (value === null || typeof value !== 'object') {
-    return JSON.stringify(value)
-  }
-
-  if (Array.isArray(value)) {
-    return `[${value.map(stableStringify).join(',')}]`
-  }
-
-  const keys = Object.keys(value).sort()
-  const fields = keys.map(
-    (key) => `${JSON.stringify(key)}:${stableStringify(value[key as keyof object])}`
-  )
-
-  return `{${fields.join(',')}}`
+  return `${query.kind}:${query.collection}:${JSON.stringify(query.where)}`
 }
 
 /** Поля верхнего уровня, которые отличаются у двух версий записи. */
@@ -587,25 +527,17 @@ const changedFields = (prev: object, next: object) => {
   return [...keys].filter((key) => !isEqual(prev[key as keyof object], next[key as keyof object]))
 }
 
-/** `get` одной коллекции — в один запрос со списком id без повторов. */
+/** `get` одной коллекции — в один запрос со списком id. */
 const mergeGets = (queries: Query[]) => {
-  const gets = new Map<string, Set<IType>>()
+  const gets = queries.filter((query): query is Queries.Get => query.kind === 'get')
   const others = queries.filter((query) => query.kind !== 'get')
+  const collections = new Set(gets.map((query) => query.collection))
 
-  for (const query of queries) {
-    if (query.kind === 'get') {
-      const ids = gets.get(query.collection) ?? new Set<IType>()
+  const merged = [...collections].map((collection): Query => {
+    const sameCollection = gets.filter((query) => query.collection === collection)
 
-      query.ids.forEach((id) => ids.add(id))
-      gets.set(query.collection, ids)
-    }
-  }
-
-  const merged = [...gets].map(([collection, ids]): Query => ({
-    kind: 'get',
-    collection,
-    ids: [...ids]
-  }))
+    return { kind: 'get', collection, ids: sameCollection.flatMap((query) => query.ids) }
+  })
 
   return [...merged, ...others]
 }
@@ -621,17 +553,4 @@ const withRetries = async <R>(attempt: () => Promise<R>, delays: number[]) => {
   }
 
   return attempt()
-}
-
-/** Промис с ручками; отказ помечен обработанным — его получает тот, кто ждёт `promise`. */
-const createDeferred = (): Deferred => {
-  const handlers = { resolve: () => {}, reject: (_: unknown) => {} }
-  const promise = new Promise<void>((resolve, reject) => {
-    handlers.resolve = resolve
-    handlers.reject = reject
-  })
-
-  promise.catch(() => {})
-
-  return { promise, ...handlers }
 }
