@@ -1,7 +1,8 @@
 /**
- * Клиент — то, чем пользуется приложение: объект данных `db` и вызовы операций `DomainsAPI` над живой частью базы
- * `LiveStore`. Домены клиент не исполняет, схема и домены нужны ему только типами: в рантайме от `@oxeo/scheme` он берёт
- * лишь вход `filter`, а имена коллекций и операций получает прокси в момент обращения. Привязка к React — `@oxeo/react`.
+ * Клиент — то, чем пользуется приложение: объект данных `db`, значения представлений `views` и вызовы операций
+ * `DomainsAPI` над живой частью базы `LiveStore`. Домены и представления клиент не исполняет, схема, домены и
+ * представления нужны ему только типами: в рантайме от `@oxeo/scheme` он берёт лишь вход `filter`, а имена коллекций,
+ * представлений и операций получает прокси в момент обращения. Привязка к React — `@oxeo/react`.
  */
 import type {
   CollectionScheme,
@@ -9,8 +10,11 @@ import type {
   DomainRoutes,
   DomainsMap,
   ExtractType,
+  FindOptions,
   IType,
   Query,
+  ViewRoutes,
+  ViewsMap,
   Where
 } from '@oxeo/scheme'
 import { ClientOptions, LiveStore } from './live-store'
@@ -26,19 +30,36 @@ import { ClientChange } from './tracker'
 export interface CollectionReader<T, I extends IType> {
   /** Запись по id; `null` — записи нет. */
   get(id: I): T | null
-  /** Записи по фильтру. */
-  find(where: Where<T>): T[]
+  /**
+   * Записи по фильтру. С опциями — окно: первые `limit` записей в порядке `order` (при равенстве — по id, предел без
+   * порядка — по id); поле порядка — число или строка верхнего уровня.
+   */
+  find(where: Where<T>, opts?: FindOptions<T>): T[]
   /** Коллекция целиком. */
   all(): T[]
   /** Число записей по фильтру, без фильтра — всех; перезапрашивается при изменениях коллекции. */
   count(where?: Where<T>): number
   /** Явная загрузка для обработчика: непокрытое — с сервера, покрытое — сразу; без фильтра — коллекция целиком. */
-  load(where?: Where<T>): Promise<T[]>
+  load(where?: Where<T>, opts?: FindOptions<T>): Promise<T[]>
 }
 
 /** Объект данных: `db.<collection>`, типы — из схемы. */
 export type DbApi<Scheme extends CollectionScheme> = {
   [K in keyof Scheme]: CollectionReader<ExtractType<Scheme[K]['model']>, Scheme[K]['identifierType']>
+}
+
+/**
+ * Значения представлений: `views.<view>.<method>(params)`, типы — из сигнатур методов класса. Чтение как у `db`: в
+ * проходе рендера подписывает и, если значения нет, записывает потребность (пустое — `null`, проход отбросится), вне
+ * рендера отдаёт только покрытое. Значение перезапрашивается, когда событие тронет коллекции, которые представление
+ * читало.
+ */
+export type ViewsApi<T extends ViewsMap> = {
+  [V in keyof T]: {
+    [M in keyof ViewRoutes<T>[V]]: (
+      params: ViewRoutes<T>[V][M]['params']
+    ) => ViewRoutes<T>[V][M]['answer']
+  }
 }
 
 /**
@@ -54,10 +75,15 @@ export type DomainsApi<T extends DomainsMap> = {
 }
 
 /**
- * Клиент. Типы схемы и доменов — параметрами (`createClient<AppScheme, AppDomains>(…)`): в рантайме ни схемы, ни доменов
- * клиенту не нужно. Поток событий открывает приложение и передаёт сообщения в `push` и `resync`.
+ * Клиент. Типы схемы, доменов и представлений — параметрами (`createClient<AppScheme, AppDomains, AppViews>(…)`): в
+ * рантайме ни схемы, ни доменов, ни представлений клиенту не нужно. Поток событий открывает приложение и передаёт
+ * сообщения в `push` и `resync`.
  */
-export const createClient = <Scheme extends CollectionScheme, Domains extends DomainsMap>(
+export const createClient = <
+  Scheme extends CollectionScheme,
+  Domains extends DomainsMap,
+  Views extends ViewsMap = {}
+>(
   options: ClientOptions
 ) => {
   const store = new LiveStore(options)
@@ -74,8 +100,8 @@ export const createClient = <Scheme extends CollectionScheme, Domains extends Do
           get: (id) => {
             return store.read({ kind: 'get', collection, ids: [id] }) as object | null
           },
-          find: (where) => {
-            return store.read({ kind: 'find', collection, where }) as object[]
+          find: (where, opts = {}) => {
+            return store.read({ kind: 'find', collection, where, ...opts }) as object[]
           },
           all: () => {
             return store.read({ kind: 'find', collection, where: null }) as object[]
@@ -83,13 +109,31 @@ export const createClient = <Scheme extends CollectionScheme, Domains extends Do
           count: (where) => {
             return store.read({ kind: 'count', collection, where: where ?? null }) as number
           },
-          load: (where) => {
-            return store.load({ kind: 'find', collection, where: where ?? null })
+          load: (where, opts = {}) => {
+            return store.load({ kind: 'find', collection, where: where ?? null, ...opts })
           }
         })
       }
 
       return readers.get(collection)!
+    }
+  })
+
+  const views = new Proxy({} as ViewsApi<Views>, {
+    get: (_, view) => {
+      if (!isMethodKey(view)) {
+        return undefined
+      }
+
+      return new Proxy({} as Record<string, unknown>, {
+        get: (__, method) => {
+          if (!isMethodKey(method)) {
+            return undefined
+          }
+
+          return (params: unknown) => store.read({ kind: 'view', view, method, params })
+        }
+      })
     }
   })
 
@@ -113,6 +157,7 @@ export const createClient = <Scheme extends CollectionScheme, Domains extends Do
 
   return {
     db,
+    views,
     DomainsAPI,
     /** Событие из потока. */
     push: (event: DomainEvent) => {

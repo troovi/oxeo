@@ -1,8 +1,9 @@
 /**
  * Рантайм доменов — серверная сторона. Вызовы выполняются строго по одному: актор и момент — в контексте, событие
  * получает ревизию, новые версии записей, которые тронула операция, и уходит всем клиентам. Пакеты запросов клиентов идут
- * мимо очереди вызовов. Транспорт, авторизацию и часовой пояс задаёт приложение через опции; фреймворк (NestJS и т. п.)
- * остаётся снаружи.
+ * мимо очереди вызовов; представления считаются по запросу и кэшируются до события, которое тронет прочитанные ими
+ * коллекции. Транспорт, авторизацию и часовой пояс задаёт приложение через опции; фреймворк (NestJS и т. п.) остаётся
+ * снаружи.
  */
 import { hash, QueueManager } from '@companix/utils-js'
 import { DomainError, ParamsError } from '@oxeo/scheme'
@@ -15,12 +16,17 @@ import type {
   DomainRoutes,
   DomainsMap,
   DomainsParams,
+  FindOptions,
   IType,
   ParamsSchema,
+  Queries,
   Query,
   QueryBatch,
   QueryResult,
-  RecordVersion
+  RecordVersion,
+  ViewContext,
+  ViewsMap,
+  ViewsParams
 } from '@oxeo/scheme'
 import type { CollectionWrite } from '../core/data-processor'
 import { getGuaranteedValueByAddress } from '../utils'
@@ -31,9 +37,23 @@ import { CounterCollection, CounterKey, createIdSource } from './ids'
 /** Чтения коллекции, которые нужны рантайму: новые версии записей и пакеты запросов. */
 interface ReadableCollection {
   get(id: IType): Promise<object | null>
-  findBy(filter: object): Promise<object[]>
+  findBy(filter: object, opts?: FindOptions): Promise<object[]>
   count(filter: object): Promise<number>
 }
+
+/** Экземпляр представлений глазами рантайма: методы вызываются по именам из запроса. */
+interface ViewInstance {
+  [method: string]: (params: unknown, ctx: ViewContext) => Promise<unknown>
+}
+
+/** Посчитанное представление: значение и коллекции, которые оно читало. */
+interface ViewValue {
+  value: unknown
+  reads: string[]
+}
+
+/** Методы коллекции, которые меняют данные: представлению они недоступны. */
+const WRITES = new Set(['create', 'update', 'remove', 'changeDiscriminator'])
 
 /** Экземпляр домена глазами рантайма: методы вызываются по именам из запроса. */
 interface DomainInstance {
@@ -58,11 +78,21 @@ export interface PartialWrite {
   error: unknown
 }
 
-export interface RuntimeOptions<T extends DomainsMap, C, Identity, Actor> {
+export interface RuntimeOptions<
+  T extends DomainsMap,
+  C,
+  Identity,
+  Actor,
+  V extends ViewsMap = ViewsMap
+> {
   /** Реестр доменов: рантайм исполняет их методы над коллекциями источника. */
   domains: T
   /** Схемы параметров операций (`createDomainsParams`): рантайм проверяет ими каждый вызов. */
   params: DomainsParams<T>
+  /** Реестр представлений: чтения, которые сервер считает и отдаёт клиенту значением. */
+  views?: V
+  /** Схемы параметров представлений (`createViewsParams`): рантайм проверяет ими каждый запрос значения. */
+  viewParams?: ViewsParams<V>
   dataSource: RuntimeSource<C>
   /** Коллекция счётчиков числовых идентификаторов; её записи клиентам не уходят и частичной записью не считаются. */
   counterCollection: CounterKey<C>
@@ -95,6 +125,44 @@ interface AddRecordsParams {
   records: object[]
 }
 
+interface ResolveViewParams<Identity, Actor> {
+  item: Queries.View
+  identity: Identity | null
+  ctx: ViewContext<Actor>
+}
+
+/** Реестр схем глазами рантайма: имя → метод → схема. */
+type ParamsRegistry = Record<string, Record<string, ParamsSchema>>
+
+interface ParseWithParams {
+  registry: ParamsRegistry
+  name: string
+  method: string
+  params: unknown
+  /** Что ищем — для текста отказа. */
+  kind: 'Operation' | 'View'
+}
+
+/**
+ * Параметры, разобранные схемой из реестра. Реестр — список публичных методов: TS-`private` в рантайме не виден, поэтому
+ * метод без схемы — неизвестный. Ключи только собственные: унаследованный `toString` схемой не станет.
+ */
+const parseWith = ({ registry, name, method, params, kind }: ParseWithParams) => {
+  const isKnown = hasOwn.call(registry, name) && hasOwn.call(registry[name], method)
+
+  if (!isKnown) {
+    throw new DomainError('notFound', `${kind} ${name}.${method} not found`)
+  }
+
+  const parsed = registry[name][method].safeParse(params)
+
+  if (!parsed.success) {
+    throw new ParamsError(parsed.error.issues)
+  }
+
+  return parsed.data
+}
+
 /** Связи, по которым ответ захватывает записи вместе с отданной: на один уровень, `HasMany` — нет. */
 const CAPTURED = new Set(['reference-to', 'reference-set', 'belongs-to'])
 
@@ -104,7 +172,8 @@ export class DomainRuntime<
   T extends DomainsMap,
   C extends ConstructorParameters<T[keyof T]>[0],
   Identity,
-  Actor
+  Actor,
+  V extends ViewsMap = ViewsMap
 > {
   /** Идентификатор запуска: после перезапуска клиенты начинают заново. */
   readonly epoch = hash()
@@ -118,6 +187,17 @@ export class DomainRuntime<
   private touched = new Map<string, CollectionWrite>()
   private isRecording = false
 
+  // views
+
+  /** Кэш значений представлений: ключ — представление, метод, параметры и идентичность. */
+  private viewCache = new Map<string, ViewValue>()
+  /** День, на который посчитаны значения кэша: с новым днём кэш пуст. */
+  private cacheDay: string | null = null
+  /** Номер изменения данных: растёт с каждой операцией, которая писала, и с удачной, и с упавшей. */
+  private stamp = 0
+  /** Номер последнего изменения коллекции: значение, посчитанное под изменение, в кэш не кладётся. */
+  private changedAt = new Map<string, number>()
+
   // source
 
   private scheme: RuntimeSource<C>['scheme']
@@ -127,9 +207,9 @@ export class DomainRuntime<
 
   // options
 
-  private options: RuntimeOptions<T, C, Identity, Actor>
+  private options: RuntimeOptions<T, C, Identity, Actor, V>
 
-  constructor(options: RuntimeOptions<T, C, Identity, Actor>) {
+  constructor(options: RuntimeOptions<T, C, Identity, Actor, V>) {
     const { domains, dataSource, counterCollection } = options
     const { scheme, collections } = dataSource
     const counter = collections[counterCollection] as unknown as CounterCollection<any>
@@ -200,12 +280,14 @@ export class DomainRuntime<
           changes: await this.changesOf()
         }
 
+        this.forgetViews(event.changes.map((version) => version.collection))
         this.options.broadcast(event)
         return event
       } catch (error) {
         this.isRecording = false
 
         if (this.touched.size > 0) {
+          this.forgetViews([...this.touched.values()].map((write) => this.collectionOf[write.model]))
           this.options.onPartialWrite({ call, writes: this.touched.size, error })
         }
 
@@ -220,20 +302,9 @@ export class DomainRuntime<
    * станет.
    */
   private parseParams({ domain, method, params }: DomainCall) {
-    const registry = this.options.params as Record<string, Record<string, ParamsSchema>>
-    const isKnown = hasOwn.call(registry, domain) && hasOwn.call(registry[domain], method)
+    const registry = this.options.params as unknown as ParamsRegistry
 
-    if (!isKnown) {
-      throw new DomainError('notFound', `Operation ${domain}.${method} not found`)
-    }
-
-    const parsed = registry[domain][method].safeParse(params)
-
-    if (!parsed.success) {
-      throw new ParamsError(parsed.error.issues)
-    }
-
-    return parsed.data
+    return parseWith({ registry, name: domain, method, params, kind: 'Operation' })
   }
 
   /** Новые версии тронутых записей: каждая читается из базы после операции, нет в базе — удалена. */
@@ -257,11 +328,18 @@ export class DomainRuntime<
    * принесёт её событие. Сначала каждый запрос пакета, затем захват записей, на которые ведут ссылки отданных записей,
    * на один уровень.
    */
-  async query({ queries }: QueryBatch) {
+  async query({ queries }: QueryBatch, identity: Identity | null = null) {
     const versions: AnswerVersions = new Map()
     const results: QueryResult[] = []
+    const viewer = { ctx: null as ViewContext<Actor> | null }
 
     for (const item of queries) {
+      if (item.kind === 'view') {
+        viewer.ctx ??= await this.viewContext(identity)
+        results.push(await this.resolveView({ item, identity, ctx: viewer.ctx }))
+        continue
+      }
+
       results.push(await this.resolve(item, versions))
     }
 
@@ -271,7 +349,10 @@ export class DomainRuntime<
   }
 
   /** Один запрос пакета: записи — в ответ, результат — их id или число. */
-  private async resolve(item: Query, versions: AnswerVersions): Promise<QueryResult> {
+  private async resolve(
+    item: Exclude<Query, Queries.View>,
+    versions: AnswerVersions
+  ): Promise<QueryResult> {
     const collection = this.collections[item.collection]
 
     if (!this.scheme.collectionsScheme[item.collection] || !collection) {
@@ -290,9 +371,107 @@ export class DomainRuntime<
       return { ids: this.addRecords({ versions, collection: item.collection, records: found }) }
     }
 
-    const found = await collection.findBy(item.where ?? {})
+    const opts = { order: item.order, limit: item.limit }
+    const found = await collection.findBy(item.where ?? {}, opts)
 
     return { ids: this.addRecords({ versions, collection: item.collection, records: found }) }
+  }
+
+  // views
+
+  /** Контекст представлений пакета: актор по идентичности (`null` — без неё) и сегодняшний день. */
+  private async viewContext(identity: Identity | null): Promise<ViewContext<Actor>> {
+    const actor = identity === null ? null : await this.options.resolveActor(identity)
+
+    return { actor, today: this.options.today(Date.now()) }
+  }
+
+  /**
+   * Значение представления: из кэша или расчётом. Кэш — на день: ключ — представление, метод, параметры и идентичность.
+   * Расчёт идёт над коллекциями, которые записывают прочитанное и не дают писать. Значение, посчитанное, пока операция
+   * меняла прочитанные коллекции, отдаётся, но в кэш не кладётся.
+   */
+  private async resolveView({ item, identity, ctx }: ResolveViewParams<Identity, Actor>) {
+    const registry = (this.options.viewParams ?? {}) as unknown as ParamsRegistry
+    const params = parseWith({
+      registry,
+      name: item.view,
+      method: item.method,
+      params: item.params,
+      kind: 'View'
+    })
+    const key = JSON.stringify([item.view, item.method, params, identity])
+
+    if (this.cacheDay !== ctx.today) {
+      this.viewCache.clear()
+      this.cacheDay = ctx.today
+    }
+
+    const cached = this.viewCache.get(key)
+
+    if (cached) {
+      return cached
+    }
+
+    const startedAt = this.stamp
+    const reads = new Set<string>()
+    const ViewClass = (this.options.views as unknown as ViewsMap)[item.view]
+    const instance = new ViewClass(this.readOnlyCollections(reads)) as ViewInstance
+    const value = await instance[item.method](params, ctx)
+    const result = { value: structuredClone(value), reads: [...reads] }
+    const isStale = result.reads.some((collection) => (this.changedAt.get(collection) ?? 0) > startedAt)
+
+    if (!isStale) {
+      this.viewCache.set(key, result)
+    }
+
+    return result
+  }
+
+  /** Коллекции для расчёта представления: каждое обращение записывает коллекцию в `reads`, запись — отказ. */
+  private readOnlyCollections(reads: Set<string>) {
+    const collections = this.collections
+
+    return new Proxy(collections, {
+      get: (target, name) => {
+        const collection = target[name as string]
+
+        if (typeof name !== 'string' || !collection) {
+          return collection
+        }
+
+        return new Proxy(collection, {
+          get: (inner, method) => {
+            const member = inner[method as keyof ReadableCollection]
+
+            if (typeof member !== 'function') {
+              return member
+            }
+
+            if (WRITES.has(method as string)) {
+              throw new DomainError('forbidden', `View cannot write ${name}.${String(method)}`)
+            }
+
+            reads.add(name)
+            return (member as (...args: unknown[]) => unknown).bind(inner)
+          }
+        })
+      }
+    })
+  }
+
+  /** Операция, которая писала, сбрасывает значения представлений, читавших тронутые ею коллекции. */
+  private forgetViews(collections: string[]) {
+    const touched = new Set(collections)
+
+    this.stamp += 1
+    touched.forEach((collection) => this.changedAt.set(collection, this.stamp))
+
+    for (const [key, cached] of this.viewCache) {
+      if (cached.reads.some((collection) => touched.has(collection))) {
+        this.viewCache.delete(key)
+      }
+    }
   }
 
   /**

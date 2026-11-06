@@ -9,6 +9,7 @@ import { AppPage, createStore, network } from '../../../app/kit'
 import { DomainEvent, QueryAnswer, createClient, createLive, createUseData } from '../lib/client'
 import type { AppDomains } from '../core/domains'
 import type { AppScheme } from '../core/scheme'
+import type { AppViews } from '../core/views'
 
 export const BASE_URL = '/api/v-next'
 
@@ -44,7 +45,9 @@ export namespace ConnectionStatuses {
 }
 
 export type ConnectionStatus =
-  ConnectionStatuses.Connecting | ConnectionStatuses.Live | ConnectionStatuses.Offline
+  | ConnectionStatuses.Connecting
+  | ConnectionStatuses.Live
+  | ConnectionStatuses.Offline
 
 export interface SessionState {
   status: ConnectionStatus
@@ -61,7 +64,7 @@ export const session = createStore<SessionState>({
  * Клиент версии: пакеты запросов — `POST data/query`, вызовы — `POST domains/<domain>/<method>` от имени системы (без
  * `x-worker-id`). Пересинхронизация мягкая: клиент забывает всё, смонтированные страницы перезапрашивают своё.
  */
-export const client = createClient<AppScheme, AppDomains>({
+export const client = createClient<AppScheme, AppDomains, AppViews>({
   transport: {
     query: (batch) => post<QueryAnswer>('data/query', batch),
     call: ({ domain, method, params }) => post<DomainEvent>(`domains/${domain}/${method}`, params)
@@ -71,8 +74,11 @@ export const client = createClient<AppScheme, AppDomains>({
   }
 })
 
-/** Объект данных и вызовы операций: промис вызова разрешается, когда событие применено у клиента. */
-export const { db, DomainsAPI } = client
+/**
+ * Объект данных, значения представлений и вызовы операций: промис вызова разрешается, когда событие применено у
+ * клиента.
+ */
+export const { db, views, DomainsAPI } = client
 
 /** Обёртка компонентов, которые читают данные; умолчания — заглушка и вид ошибки страницы kit. */
 export const live = createLive(client, {

@@ -2,7 +2,7 @@
  * Контракт коллекций — то, что домены видят как `this.collections`. Типы живут здесь, а не рядом с `DataSource`: домены
  * лежат в общем `core` и пишутся без серверных пакетов, реализацию даёт `DataSource` пакета `@oxeo/server`.
  */
-import { Where } from '../../filter'
+import { FindOptions, Where } from '../../filter'
 import { ExtractType } from '../../utils'
 import { CollectionScheme, DiscriminatedMeta } from '../data-scheme'
 
@@ -12,7 +12,8 @@ export interface CollectionApi<T = object, I extends IType = IType> {
   get: (id: I) => Promise<T | null>
   getAll: () => Promise<T[]>
   findOneBy: (filter: Where<T>) => Promise<T | null>
-  findBy: (filter: Where<T>) => Promise<T[]>
+  /** Записи по фильтру; опции — порядок и предел. */
+  findBy: (filter: Where<T>, opts?: FindOptions<T>) => Promise<T[]>
   existsBy: (filter: Where<T>) => Promise<boolean>
   exists: (id: I) => Promise<boolean>
   /** Число записей по фильтру; без фильтра — всех. */

@@ -1,6 +1,6 @@
 {
   "name": "@oxeo-drivers/memory",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Драйвер @oxeo/server в памяти процесса: для тестов доменов и песочниц",
   "repository": {
     "type": "git",

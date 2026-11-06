@@ -1,4 +1,4 @@
-import { IType } from '@oxeo/scheme'
+import { FindOptions, IType } from '@oxeo/scheme'
 
 export namespace PatchActions {
   interface BasePatch {
@@ -53,6 +53,11 @@ export namespace CollectionDriverParams {
     filter: object
   }
 
+  /** Фильтр с опциями выборки: порядок (при равенстве — по id) и предел. */
+  export interface Find extends Filter {
+    opts?: FindOptions
+  }
+
   /** Число записей; без фильтра — всех. */
   export interface Count extends Model {
     filter?: object
@@ -66,7 +71,7 @@ export interface CollectionDriver {
   get: (params: CollectionDriverParams.Record) => Promise<object | null>
   exists: (params: CollectionDriverParams.Record) => Promise<boolean>
   findOneBy: (params: CollectionDriverParams.Filter) => Promise<object | null>
-  findBy: (params: CollectionDriverParams.Filter) => Promise<object[]>
+  findBy: (params: CollectionDriverParams.Find) => Promise<object[]>
   existsBy: (filter: CollectionDriverParams.Filter) => Promise<boolean>
   count: (params: CollectionDriverParams.Count) => Promise<number>
   // setters (private - cannot be accesed from dataSource level)

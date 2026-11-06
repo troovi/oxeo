@@ -48,8 +48,8 @@ export class DataSource<Scheme extends CollectionScheme, Driver extends Collecti
         findOneBy: (filter) => {
           return driver.findOneBy({ model: collectionScheme.name, filter })
         },
-        findBy: (filter) => {
-          return driver.findBy({ model: collectionScheme.name, filter })
+        findBy: (filter, opts) => {
+          return driver.findBy({ model: collectionScheme.name, filter, opts })
         },
         existsBy: (filter) => {
           return driver.existsBy({ model: collectionScheme.name, filter })

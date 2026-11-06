@@ -97,8 +97,28 @@ export class MongoCollectionDriver<Scheme extends CollectionScheme> implements C
     return this.collections[model].findOne(buildFlattenMap(filter)).lean().exec()
   }
 
-  async findBy({ model, filter }: CollectionDriverParams.Filter) {
-    return this.collections[model].find(buildFlattenMap(filter)).lean().exec()
+  /**
+   * Записи по фильтру; порядок — поле и id по возрастанию при равенстве, предел без порядка — по id: как `windowOf`
+   * памяти и клиента.
+   */
+  async findBy({ model, filter, opts = {} }: CollectionDriverParams.Find) {
+    const query = this.collections[model].find(buildFlattenMap(filter))
+    const { order, limit } = opts
+    const idKey = this.getIdentifierKey(model)
+
+    if (order) {
+      query.sort({ [order.field]: order.direction === 'asc' ? 1 : -1, [idKey]: 1 })
+    }
+
+    if (!order && limit !== undefined) {
+      query.sort({ [idKey]: 1 })
+    }
+
+    if (limit !== undefined) {
+      query.limit(limit)
+    }
+
+    return query.lean().exec()
   }
 
   async getAll({ model }: CollectionDriverParams.Model) {

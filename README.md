@@ -24,15 +24,19 @@ project/
       <name>/
         <name>.domain.ts операции
         <name>.params.ts параметры операций на zod
+    views/
+      index.ts           реестр представлений
+      params.ts          реестр схем параметров представлений — рантайму
+      <name>.views.ts    чтения, которые считает сервер
   server/                серверное приложение: рантайм доменов, драйвер базы, маршруты
   client/                клиентское приложение: клиент oxeo, компоненты
 ```
 
-| Часть    | Что в ней                                 | Как использует `core` | Пакеты oxeo                           |
-| -------- | ----------------------------------------- | --------------------- | ------------------------------------ |
-| `core`   | схемы, домены, параметры операций         | —                     | `@oxeo/scheme`                         |
-| `server` | рантайм, драйвер, маршруты, транспорт     | исполняет в рантайме  | `@oxeo/server`, драйвер базы           |
-| `client` | клиент oxeo, компоненты, экраны            | **только типы**       | `@oxeo/client`, привязка (`@oxeo/react`) |
+| Часть    | Что в ней                               | Как использует `core` | Пакеты oxeo                              |
+| -------- | --------------------------------------- | --------------------- | ---------------------------------------- |
+| `core`   | схемы, домены, представления, параметры | —                     | `@oxeo/scheme`                           |
+| `server` | рантайм, драйвер, маршруты, транспорт   | исполняет в рантайме  | `@oxeo/server`, драйвер базы             |
+| `client` | клиент oxeo, компоненты, экраны         | **только типы**       | `@oxeo/client`, привязка (`@oxeo/react`) |
 
 Главное правило структуры: клиент импортирует из `core` только типы, через `import type`. Схемы, реализация доменов и
 zod предназначены серверу. Из `import type` сборщик ничего не берёт, поэтому ни декораторы, ни домены, ни zod в сборку
@@ -191,6 +195,54 @@ export const runtime = new DomainRuntime({
 })
 ```
 
+### Представления
+
+Представление — чтение, которое считает сервер и отдаёт клиенту значением: сводки, агрегаты, выборки с логикой, которую
+не выражает фильтр. Клиенту не нужны записи, из которых значение сложено. Класс представлений получает в конструкторе
+только коллекции, метод — `(params, ctx)`, где `ctx` — кто смотрит и какой сегодня день; результат — JSON. Параметры, как у
+операций, проверяет реестр схем.
+
+```ts
+// core/views/stats.views.ts
+export class StatsViews {
+  constructor(private collections: Collections<AppScheme>) {}
+
+  async drafts(params: { authorId: number }, ctx: ViewContext<Actor>) {
+    return this.collections.note.count({ authorId: params.authorId, status: 'draft' })
+  }
+}
+
+// core/views/index.ts
+export const appViews = { stats: StatsViews }
+
+export type AppViews = typeof appViews
+
+// core/views/params.ts
+export const appViewParams = createViewsParams<AppViews>({
+  stats: { drafts: z.object({ authorId: z.number() }) }
+})
+
+// server/runtime.ts
+new DomainRuntime({ domains, params, views: appViews, viewParams: appViewParams, … })
+
+// маршрут пакета запросов: идентичность — для ctx представлений
+runtime.query(batch, identity)
+```
+
+Рантайм кэширует значение на день по представлению, методу, параметрам и идентичности. Расчёт идёт над коллекциями,
+которые запоминают, что прочитано, и не дают писать: запись из представления — `DomainError` с кодом `forbidden`.
+Операция, которая писала в прочитанные коллекции, — удачная или упавшая на полпути, — сбрасывает значение. Ответ несёт
+значение и список прочитанных коллекций: по нему клиент знает, когда перезапросить.
+
+### Порядок и предел
+
+`findBy(filter, { order, limit })` — окно: первые `limit` записей в порядке поля верхнего уровня (число или строка), при
+равных значениях — по id по возрастанию; предел без порядка — по id. Пустое значение поля идёт раньше чисел, числа —
+раньше строк, как в Mongo. Тот же порядок держат драйвер памяти и клиент (`windowOf` из `@oxeo/scheme/filter`), Mongo —
+сортировкой `{ field: ±1, id: 1 }`.
+
+### Драйвер
+
 Драйвер подключается отдельным пакетом. `@oxeo-drivers/mongo` хранит данные в MongoDB и даёт модуль NestJS
 (`MongooseDriverModule`, `InjectDataSource`), `@oxeo-drivers/memory` держит их в памяти процесса: он нужен тестам
 доменов и песочницам.
@@ -206,9 +258,9 @@ import { createLive, createUseData } from '@oxeo/react'
 import type { AppDomains } from '../core/domains'
 import type { AppScheme } from '../core/scheme'
 
-export const client = createClient<AppScheme, AppDomains>({ transport })
+export const client = createClient<AppScheme, AppDomains, AppViews>({ transport })
 
-export const { db, DomainsAPI } = client
+export const { db, views, DomainsAPI } = client
 export const live = createLive(client, { fallback: <Spinner />, error: (props) => <LoadError {...props} /> })
 export const useData = createUseData(client)
 ```
@@ -257,6 +309,26 @@ export const NotesPage = live(() => {
 Смена фильтра внутри обёртки тоже даёт заглушку, если новый запрос не покрыт. Прежний вид до ответа держат
 `startTransition` или `useDeferredValue`. После `client.resync` заглушку показывают все обёртки.
 
+Значение представления читается так же: `views.<view>.<method>(params)` в обёртке подписывает и догружает, вне неё
+отдаёт только покрытое. Событие, которое тронуло коллекции, прочитанные представлением, ставит перезапрос значения;
+события подряд дают один пакет, до ответа виден прежний результат.
+
+```tsx
+export const AuthorCard = live(({ authorId }: { authorId: number }) => {
+  const drafts = views.stats.drafts({ authorId })
+  const latest = db.note.find(
+    { authorId },
+    { order: { field: 'createdAt', direction: 'desc' }, limit: 5 }
+  )
+
+  return <Card drafts={drafts} notes={latest} />
+})
+```
+
+Окно `find(where, { order, limit })` живёт, как обычный запрос: событие вставляет запись, если она лучше худшей в окне,
+и та выходит. Если из полного окна ушла запись или худшая сдвинулась дальше, следующая неизвестна: окно перезапрашивается,
+а до ответа показывает прежний состав без ушедшей. Над коллекцией, загруженной целиком, окно считается на месте.
+
 Поток событий открывает приложение и передаёт сообщения в `client.push` и `client.resync`. После обрыва потока
 приложение вызывает `client.resync`: события за время обрыва потеряны.
 
@@ -265,18 +337,18 @@ export const NotesPage = live(() => {
 Репозиторий делится на группы: `core/*` — пакеты ядра, `drivers/*` — драйверы баз данных, `tools/*` — инструменты
 разработки. Рядом с ними — `sandbox`, песочница версий библиотеки.
 
-| Папка            | Пакет                         | Что в нём                                                                            | Кто берёт                    |
-| ---------------- | ----------------------------- | ------------------------------------------------------------------------------------ | ---------------------------- |
-| `core/scheme`    | `@oxeo/scheme`        | декораторы, `DataScheme`, `schemaOf`, контракт доменов и коллекций, фильтр, протокол | `core`; клиент — только типы |
-| `core/server`    | `@oxeo/server`        | `DataSource`, `DataProcessor`, `DomainRuntime`, договор драйвера                     | сервер                       |
-| `core/client`    | `@oxeo/client`        | живая часть базы, чтения, пакеты запросов, события, вызовы операций                  | клиент                       |
-| `core/react`     | `@oxeo/react`         | `createLive`, `createUseData`                                                        | клиент на React              |
-| `core/types`     | `@oxeo/types`         | типы HTTP-маршрутов и файлов                                                         | приложения                   |
-| `drivers/mongo`  | `@oxeo-drivers/mongo`  | драйвер MongoDB, модуль NestJS                                                       | сервер                       |
-| `drivers/memory` | `@oxeo-drivers/memory` | драйвер в памяти процесса                                                            | тесты доменов, песочницы     |
-| `tools/devkit`   | `@oxeo/devkit`        | макетная схема и кейсы целостности; не публикуется                                   | тесты пакетов                |
-| `tools/visual`   | `@oxeo/visual`        | интерактивная карта схемы                                                            | проект, для разработки       |
-| `sandbox`        | `@oxeo/sandbox`       | песочница версий библиотеки; не публикуется, устройство — `sandbox/README.md`        | разработка oxeo               |
+| Папка            | Пакет                  | Что в нём                                                                                           | Кто берёт                    |
+| ---------------- | ---------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `core/scheme`    | `@oxeo/scheme`         | декораторы, `DataScheme`, `schemaOf`, контракт доменов, представлений и коллекций, фильтр, протокол | `core`; клиент — только типы |
+| `core/server`    | `@oxeo/server`         | `DataSource`, `DataProcessor`, `DomainRuntime`, договор драйвера                                    | сервер                       |
+| `core/client`    | `@oxeo/client`         | живая часть базы, чтения, пакеты запросов, события, вызовы операций                                 | клиент                       |
+| `core/react`     | `@oxeo/react`          | `createLive`, `createUseData`                                                                       | клиент на React              |
+| `core/types`     | `@oxeo/types`          | типы HTTP-маршрутов и файлов                                                                        | приложения                   |
+| `drivers/mongo`  | `@oxeo-drivers/mongo`  | драйвер MongoDB, модуль NestJS                                                                      | сервер                       |
+| `drivers/memory` | `@oxeo-drivers/memory` | драйвер в памяти процесса                                                                           | тесты доменов, песочницы     |
+| `tools/devkit`   | `@oxeo/devkit`         | макетная схема и кейсы целостности; не публикуется                                                  | тесты пакетов                |
+| `tools/visual`   | `@oxeo/visual`         | интерактивная карта схемы                                                                           | проект, для разработки       |
+| `sandbox`        | `@oxeo/sandbox`        | песочница версий библиотеки; не публикуется, устройство — `sandbox/README.md`                       | разработка oxeo              |
 
 Зависимости идут в одну сторону. Драйверы зависят от `@oxeo/server`, он — от `@oxeo/scheme`. Клиентская ветка от
 серверной не зависит.
@@ -293,8 +365,8 @@ export const NotesPage = live(() => {
 - `@oxeo/server` — всё, что исполняется только на сервере. Конкретных драйверов и фреймворка в нём нет.
 - `@oxeo/client` — всё, что исполняется только на клиенте. От схемы он берёт типы.
 
-Единственное общее для сервера и клиента в рантайме — сверка записи с фильтром `matches`: тот же код работает в драйвере
-памяти и на клиенте. Поэтому у `@oxeo/scheme` два входа: главный и `@oxeo/scheme/filter` без декораторов и zod. Сборка
+Единственное общее для сервера и клиента в рантайме — сверка записи с фильтром `matches` и порядок окна `windowOf`: тот
+же код работает в драйвере памяти и на клиенте. Поэтому у `@oxeo/scheme` два входа: главный и `@oxeo/scheme/filter` без декораторов и zod. Сборка
 `@oxeo/client` вшивает этот вход в себя, и в рантайме клиент к `@oxeo/scheme` не обращается.
 
 ## Разработка

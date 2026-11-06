@@ -4,6 +4,7 @@
  */
 import type { IType } from './core/types/collections.types'
 import type { DomainContext } from './domains/context'
+import type { FindOrder } from './filter'
 
 // queries
 
@@ -15,11 +16,16 @@ export namespace Queries {
     ids: IType[]
   }
 
-  /** Записи коллекции по фильтру; `where: null` — коллекция целиком. */
+  /**
+   * Записи коллекции по фильтру; `where: null` — коллекция целиком. С `order` и `limit` — окно: первые `limit` записей в
+   * порядке `order` (при равенстве — по id).
+   */
   export interface Find {
     kind: 'find'
     collection: string
     where: object | null
+    order?: FindOrder
+    limit?: number
   }
 
   /** Число записей коллекции по фильтру; `where: null` — всех. */
@@ -28,9 +34,17 @@ export namespace Queries {
     collection: string
     where: object | null
   }
+
+  /** Значение представления: метод класса представлений, который исполняет сервер. */
+  export interface View {
+    kind: 'view'
+    view: string
+    method: string
+    params: unknown
+  }
 }
 
-export type Query = Queries.Get | Queries.Find | Queries.Count
+export type Query = Queries.Get | Queries.Find | Queries.Count | Queries.View
 
 /** Пакет запросов — одно обращение к серверу. */
 export interface QueryBatch {
@@ -56,9 +70,15 @@ export namespace QueryResults {
   export interface Count {
     count: number
   }
+
+  /** Результат `view`: значение и коллекции, которые представление читало, — по ним клиент знает, когда перезапросить. */
+  export interface Value {
+    value: unknown
+    reads: string[]
+  }
 }
 
-export type QueryResult = QueryResults.Records | QueryResults.Count
+export type QueryResult = QueryResults.Records | QueryResults.Count | QueryResults.Value
 
 /**
  * Ответ на пакет. Записи — и те, что подошли под запросы, и захваченные по ссылкам на один уровень, каждая один раз;

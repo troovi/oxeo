@@ -14,7 +14,9 @@ import {
   Model,
   Prop,
   ReferenceTo,
+  ViewContext,
   createDomainsParams,
+  createViewsParams,
   defineCollection,
   schemaOf
 } from '@oxeo/scheme'
@@ -137,6 +139,42 @@ export const params = createDomainsParams<typeof domains>({
   }
 })
 
+/** Сколько раз представления считались: кэш рантайма не должен считать их снова. */
+export const viewRuns = { count: 0 }
+
+class NotesViews {
+  constructor(private collections: Collections<Scheme>) {}
+
+  /** Сводка автора: имя, черновики и опубликованные; кто смотрит — из контекста. */
+  async summary(params: { authorId: number }, ctx: ViewContext<Actor>) {
+    const notes = await this.collections.note.findBy({ authorId: params.authorId })
+    const author = await this.collections.author.get(params.authorId)
+
+    viewRuns.count += 1
+
+    return {
+      author: author?.name ?? null,
+      drafts: notes.filter((note) => note.status === 'draft').length,
+      published: notes.filter((note) => note.status === 'published').length,
+      viewer: ctx.actor?.name ?? null
+    }
+  }
+
+  /** Представление не пишет: запись — отказ. */
+  async broken(params: { noteId: number }) {
+    await this.collections.note.remove(params.noteId)
+  }
+}
+
+export const views = { notes: NotesViews }
+
+export const viewParams = createViewsParams<typeof views>({
+  notes: {
+    summary: schemaOf(NoteEntity).pick({ authorId: true }),
+    broken: schemaOf(NoteEntity).pick({ noteId: true })
+  }
+})
+
 export const source = () => new DataSource(scheme, { createDriver: createMemoryDriver })
 
 export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
@@ -153,6 +191,8 @@ export const createRuntime = () => {
   const runtime = new DomainRuntime({
     domains,
     params,
+    views,
+    viewParams,
     dataSource: serverSource,
     counterCollection: 'counter',
     resolveActor: (name: string): Actor => {

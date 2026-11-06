@@ -1,5 +1,5 @@
 import { isObjectLike } from '@companix/utils-js'
-import { CollectionInfo, IType, KeyOfType, matches } from '@oxeo/scheme'
+import { CollectionInfo, FindOptions, IType, KeyOfType, matches, windowOf } from '@oxeo/scheme'
 import { UpdatePatch, __DEV__, styles, xRay } from '@oxeo/server'
 
 export class IndexedCollectionStore<T> {
@@ -113,8 +113,20 @@ export class IndexedCollectionStore<T> {
     return this.data.find((item) => matches(item, filter)) ?? null
   }
 
-  findBy(filter: object = {}) {
-    return this.data.filter((item) => matches(item, filter))
+  /** Записи по фильтру; с опциями — в порядке и в пределе выборки, как у Mongo-драйвера и клиента (`windowOf`). */
+  findBy(filter: object = {}, opts?: FindOptions) {
+    const found = this.data.filter((item) => matches(item, filter))
+
+    if (!opts) {
+      return found
+    }
+
+    const entries = found.map((item): [IType, object] => [
+      item[this.identifierKey] as IType,
+      item as object
+    ])
+
+    return windowOf(entries, opts).map(([, item]) => item as T)
   }
 
   count(filter: object = {}) {

@@ -17,6 +17,8 @@ import { Actor } from '../core/domains'
 import { AppDomains, appDomains } from '../core/domains'
 import { appParams } from '../core/domains/params'
 import { AppScheme, dataScheme } from '../core/scheme'
+import { AppViews, appViews } from '../core/views'
+import { appViewParams } from '../core/views/params'
 import { seed } from './seed'
 
 /** Идентичность вызова — сотрудник из заголовка `x-worker-id`; без заголовка вызов системный. */
@@ -51,7 +53,7 @@ export class RuntimeService implements OnModuleInit {
 
   /** База версии и рантайм над ней; сброс заменяет обоих — пустая база, новая эпоха. */
   source: SandboxSource
-  runtime: DomainRuntime<AppDomains, SandboxSource['collections'], Identity, Actor>
+  runtime: DomainRuntime<AppDomains, SandboxSource['collections'], Identity, Actor, AppViews>
 
   /** Посев: сколько событий и за сколько миллисекунд. */
   seeded = { events: 0, ms: 0 }
@@ -85,13 +87,16 @@ export class RuntimeService implements OnModuleInit {
     return this.runtime.run({ domain, method, params: body } as never, identity)
   }
 
-  /** Пакет запросов клиента; ответ — записи с захватом ссылок и результаты запросов. */
-  query(batch: QueryBatch) {
+  /**
+   * Пакет запросов клиента; ответ — записи с захватом ссылок и результаты запросов. Идентичность — для представлений: их
+   * значение считается для того, кто смотрит.
+   */
+  query(batch: QueryBatch, identity: Identity | null) {
     if (!Array.isArray(batch?.queries)) {
       throw new BadRequestException({ code: 'params', message: 'Пакет запросов — { queries: [...] }' })
     }
 
-    return this.runtime.query(batch)
+    return this.runtime.query(batch, identity)
   }
 
   /**
@@ -130,6 +135,8 @@ export class RuntimeService implements OnModuleInit {
     this.runtime = new DomainRuntime({
       domains: appDomains,
       params: appParams,
+      views: appViews,
+      viewParams: appViewParams,
       dataSource: source,
       counterCollection: 'counter',
       /** Актор — работающий сотрудник; уволенный или неизвестный — отказ. */

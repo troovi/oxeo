@@ -17,7 +17,7 @@ import { RuntimeService } from './runtime.service'
 
 /**
  * Протокол версии: `POST domains/<domain>/<method>` → событие, `POST data/query` — пакет запросов клиента
- * (записи с захватом ссылок), поток событий всем подключённым — SSE вместо сокета (той же односторонней
+ * (записи с захватом ссылок, значения представлений), поток событий всем подключённым — SSE вместо сокета (той же односторонней
  * природы, без зависимостей). Снимка нет. `POST reset` — песочнице: база заново, с посевом.
  */
 @Controller()
@@ -38,8 +38,10 @@ export class VersionController {
   }
 
   @Post('data/query')
-  query(@Body() batch: QueryBatch) {
-    return this.runtime.query(batch)
+  query(@Body() batch: QueryBatch, @Headers('x-worker-id') workerId?: string) {
+    const identity = workerId ? { workerId: Number(workerId) } : null
+
+    return this.runtime.query(batch, identity)
   }
 
   /** Сброс базы: пустая база, новая эпоха и посев заново; ответ — эпоха и ревизия после посева. */

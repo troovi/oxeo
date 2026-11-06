@@ -29,8 +29,8 @@ export class MemoryCollectionDriver<Scheme extends CollectionScheme> implements 
     return this.collections[model].findOneBy(filter)
   }
 
-  async findBy({ model, filter }: CollectionDriverParams.Filter) {
-    return this.collections[model].findBy(filter)
+  async findBy({ model, filter, opts }: CollectionDriverParams.Find) {
+    return this.collections[model].findBy(filter, opts)
   }
 
   async exists({ model, id }: CollectionDriverParams.Record) {

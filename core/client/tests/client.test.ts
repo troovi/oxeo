@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { DomainEvent, Query, QueryAnswer, RecordVersion } from '@oxeo/scheme'
-import { clone, createRuntime, domains, tick, type Scheme } from '../../server/tests/runtime.fixture'
+import {
+  clone,
+  createRuntime,
+  domains,
+  tick,
+  viewRuns,
+  views,
+  type Scheme
+} from '../../server/tests/runtime.fixture'
 import { ClientChange, Tracker, UncoveredReadError, createClient } from '../lib'
 
 /** Клиент над рантаймом: пакеты и вызовы — через копию, как по сети; поток — по подписке. */
@@ -9,18 +17,18 @@ const connectClient = (
   onResync?: (reason: string) => void
 ) => {
   const queries: unknown[] = []
-  const client = createClient<Scheme, typeof domains>({
+  const client = createClient<Scheme, typeof domains, typeof views>({
     transport: {
       query: async (batch) => {
         queries.push(clone(batch))
-        return clone(await fixture.runtime.query(clone(batch)))
+        return clone(await fixture.runtime.query(clone(batch), 'автор'))
       },
       call: async ({ domain, method, params }) => {
         return clone(await fixture.runtime.run({ domain, method, params } as never, 'автор'))
       }
     },
     retries: [],
-    countDelay: 0,
+    refreshDelay: 0,
     onResync
   })
 
@@ -245,7 +253,7 @@ describe('пересинхронизация и пакеты в полёте', (
         }
       },
       retries: [],
-      countDelay: 0
+      refreshDelay: 0
     })
 
     return { client, answers, refusals }
@@ -439,5 +447,133 @@ describe('поток и ответ вызова', () => {
     client.push(event(2, [], 'e2'))
 
     expect(reasons).toEqual(['stream', 'stream'])
+  })
+})
+
+describe('окна find и представления', () => {
+  /** Автор и заметки с временем создания по списку. */
+  const seed = async (fixture: ReturnType<typeof createRuntime>, times: number[]) => {
+    await fixture.runtime.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Аня' } }, null)
+
+    for (const at of times) {
+      await fixture.runtime.run(
+        { domain: 'notes', method: 'add', params: { text: `${at}`, authorId: 1 } },
+        null,
+        { at }
+      )
+    }
+  }
+
+  const latest = { order: { field: 'createdAt', direction: 'desc' }, limit: 2 } as const
+
+  it('окно: лучшая новая запись входит без запроса, худший член выходит', async () => {
+    const fixture = createRuntime()
+    const { client, queries } = connectClient(fixture)
+
+    await seed(fixture, [30, 10, 20])
+    await client.db.note.load({}, latest)
+
+    expect(client.db.note.find({}, latest).map((note) => note.noteId)).toEqual([1, 3])
+
+    // хуже худшего — окно не меняется; лучше — входит, худший выходит
+    await fixture.runtime.run(
+      { domain: 'notes', method: 'add', params: { text: '5', authorId: 1 } },
+      null,
+      {
+        at: 5
+      }
+    )
+    await fixture.runtime.run(
+      { domain: 'notes', method: 'add', params: { text: '40', authorId: 1 } },
+      null,
+      {
+        at: 40
+      }
+    )
+    await tick()
+
+    expect(client.db.note.find({}, latest).map((note) => note.noteId)).toEqual([5, 1])
+    expect(queries).toHaveLength(1)
+  })
+
+  it('окно: ушедший член полного окна — перезапрос, до ответа — прежний состав без него', async () => {
+    const fixture = createRuntime()
+    const { client, queries } = connectClient(fixture)
+
+    await seed(fixture, [30, 10, 20])
+    await client.db.note.load({}, latest)
+    await fixture.runtime.run({ domain: 'notes', method: 'remove', params: { noteId: 1 } }, null)
+
+    expect(client.db.note.find({}, latest).map((note) => note.noteId)).toEqual([3])
+
+    await tick(20)
+
+    expect(client.db.note.find({}, latest).map((note) => note.noteId)).toEqual([3, 2])
+    expect(queries).toHaveLength(2)
+  })
+
+  it('окно над коллекцией целиком считается на месте', async () => {
+    const fixture = createRuntime()
+    const { client, queries } = connectClient(fixture)
+
+    await seed(fixture, [30, 10, 20])
+    await client.db.note.load()
+
+    const oldest = client.db.note.find(
+      { status: 'draft' },
+      { order: { field: 'createdAt', direction: 'asc' }, limit: 1 }
+    )
+
+    expect(oldest.map((note) => note.noteId)).toEqual([2])
+    expect(queries).toHaveLength(1)
+  })
+
+  it('представление: потребность прохода, значение, перезапрос после события по прочитанной коллекции', async () => {
+    const fixture = createRuntime()
+    const { client, queries } = connectClient(fixture)
+    const tracker = new Tracker()
+    const changes: ClientChange[] = []
+
+    await seed(fixture, [30, 10])
+
+    const body = () => client.views.notes.summary({ authorId: 1 })
+
+    expect(pass(tracker, body)).toBeNull()
+    expect([...tracker.needs.values()]).toEqual([
+      { kind: 'view', view: 'notes', method: 'summary', params: { authorId: 1 } }
+    ])
+
+    await client.request([...tracker.needs.values()])
+
+    expect(pass(tracker, body)).toEqual({ author: 'Аня', drafts: 2, published: 0, viewer: 'автор' })
+
+    client.subscribe((change) => changes.push(change))
+
+    const runs = viewRuns.count
+
+    await fixture.runtime.run({ domain: 'notes', method: 'publish', params: { noteId: 1 } }, null)
+    await tick(20)
+
+    expect(client.views.notes.summary({ authorId: 1 })).toMatchObject({ drafts: 1, published: 1 })
+    expect(viewRuns.count).toBe(runs + 1)
+    expect(queries).toHaveLength(2)
+    expect(changes.some((change) => tracker.isAffected(change))).toBe(true)
+  })
+
+  it('представление вне рендера — только покрытое; пересинхронизация забывает значение', async () => {
+    const fixture = createRuntime()
+    const { client } = connectClient(fixture)
+
+    await seed(fixture, [30])
+
+    expect(() => client.views.notes.summary({ authorId: 1 })).toThrow(UncoveredReadError)
+
+    await client.request([{ kind: 'view', view: 'notes', method: 'summary', params: { authorId: 1 } }])
+
+    expect(client.views.notes.summary({ authorId: 1 })).toMatchObject({ drafts: 1 })
+
+    client.resync('сервер: reset')
+
+    expect(() => client.views.notes.summary({ authorId: 1 })).toThrow(UncoveredReadError)
   })
 })

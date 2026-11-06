@@ -50,7 +50,11 @@ const summaryOf = (entry: NetworkEntry) => {
 
   if (entry.kind === 'request' && entry.url.endsWith('/data/query')) {
     const batch = entry.body as QueryBatch
-    const queries = batch.queries.map((query) => `${query.kind} ${query.collection}`)
+    const queries = batch.queries.map((query) => {
+      return query.kind === 'view'
+        ? `view ${query.view}.${query.method}`
+        : `${query.kind} ${query.collection}${query.kind === 'find' && query.limit ? `[${query.limit}]` : ''}`
+    })
 
     return `query · ${queries.join(', ')}`
   }
