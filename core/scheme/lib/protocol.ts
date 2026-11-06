@@ -76,9 +76,27 @@ export namespace QueryResults {
     value: unknown
     reads: string[]
   }
+
+  /**
+   * Отказ одного запроса: коллекции нет, параметры представления не прошли схему, представление упало. Остальные запросы
+   * пакета отвечены как обычно; код — `DomainError.code`, у непредвиденной ошибки — `internal`.
+   */
+  export interface Failure {
+    error: QueryError
+  }
 }
 
-export type QueryResult = QueryResults.Records | QueryResults.Count | QueryResults.Value
+/** Отказ запроса: код и текст. */
+export interface QueryError {
+  code: string
+  message: string
+}
+
+export type QueryResult =
+  | QueryResults.Records
+  | QueryResults.Count
+  | QueryResults.Value
+  | QueryResults.Failure
 
 /**
  * Ответ на пакет. Записи — и те, что подошли под запросы, и захваченные по ссылкам на один уровень, каждая один раз;

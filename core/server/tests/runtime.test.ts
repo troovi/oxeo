@@ -168,9 +168,18 @@ describe('DomainRuntime', () => {
 
     expect(keys.sort()).toEqual(['author:1', 'author:2', 'note:1', 'note:2'])
 
-    const unknown = runtime.query({ queries: [{ kind: 'find', collection: 'missing', where: null }] })
+    // отказ запроса — его результат, соседние запросы пакета отвечены
+    const partial = await runtime.query({
+      queries: [
+        { kind: 'find', collection: 'missing', where: null },
+        { kind: 'count', collection: 'author', where: null }
+      ]
+    })
 
-    await expect(unknown).rejects.toMatchObject({ code: 'notFound' })
+    expect(partial.results).toEqual([
+      { error: { code: 'notFound', message: expect.any(String) } },
+      { count: 2 }
+    ])
   })
 })
 
@@ -258,27 +267,35 @@ describe('окна find и представления', () => {
     expect(afterBroken.results[0]).toMatchObject({ value: { drafts: 3 } })
   })
 
-  it('представление не пишет; неизвестное — notFound, параметры — ParamsError', async () => {
-    const { runtime } = createRuntime()
+  it('отказы представлений — результатами: не пишет, неизвестное, параметры, упавшее', async () => {
+    const { runtime, queryErrors } = createRuntime()
 
     await seed(runtime)
 
-    const write = runtime.query({
-      queries: [{ kind: 'view', view: 'notes', method: 'broken', params: { noteId: 1 } }]
+    const answer = await runtime.query({
+      queries: [
+        { kind: 'view', view: 'notes', method: 'broken', params: { noteId: 1 } },
+        { kind: 'view', view: 'notes', method: 'toString', params: {} },
+        { kind: 'view', view: 'notes', method: 'summary', params: { authorId: 'один' } },
+        { kind: 'view', view: 'notes', method: 'crash', params: {} },
+        { kind: 'view', view: 'notes', method: 'summary', params: { authorId: 1 } }
+      ]
     })
 
-    await expect(write).rejects.toMatchObject({ code: 'forbidden' })
-
-    const unknown = runtime.query({
-      queries: [{ kind: 'view', view: 'notes', method: 'toString', params: {} }]
-    })
-
-    await expect(unknown).rejects.toMatchObject({ code: 'notFound' })
-
-    const invalid = runtime.query({
-      queries: [{ kind: 'view', view: 'notes', method: 'summary', params: { authorId: 'один' } }]
-    })
-
-    await expect(invalid).rejects.toBeInstanceOf(ParamsError)
+    expect(answer.results.map((result) => ('error' in result ? result.error.code : 'ok'))).toEqual([
+      'forbidden',
+      'notFound',
+      'params',
+      'internal',
+      'ok'
+    ])
+    // непредвиденная ошибка не уходит клиенту, а попадает в onQueryError
+    expect(answer.results[3]).toEqual({ error: { code: 'internal', message: 'Запрос не выполнен' } })
+    expect(queryErrors.map(({ error }) => (error as Error).name)).toEqual([
+      'DomainError',
+      'DomainError',
+      'ParamsError',
+      'TypeError'
+    ])
   })
 })

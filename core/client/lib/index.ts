@@ -6,6 +6,13 @@
 export * from './client'
 export * from './tracker'
 
-export { UncoveredReadError } from './live-store'
+export { QueryFailedError, UncoveredReadError } from './live-store'
 export type { ClientOptions, ClientTransport } from './live-store'
-export type { DomainEvent, Query, QueryAnswer, QueryBatch, RecordVersion } from '@oxeo/scheme'
+export type {
+  DomainEvent,
+  Query,
+  QueryAnswer,
+  QueryBatch,
+  QueryError,
+  RecordVersion
+} from '@oxeo/scheme'

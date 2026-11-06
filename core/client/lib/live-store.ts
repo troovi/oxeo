@@ -14,7 +14,9 @@ import type {
   Query,
   QueryAnswer,
   QueryBatch,
+  QueryError,
   QueryResult,
+  QueryResults,
   RecordVersion
 } from '@oxeo/scheme'
 import { globalState } from './global-state'
@@ -41,6 +43,18 @@ export interface ClientOptions {
   refreshDelay?: number
   /** Клиент забыл всё и начинает заново: команда сервера, смена эпохи, разрыв ревизий. */
   onResync?: (reason: string) => void
+}
+
+/** Сервер отказал запросу: коллекции нет, параметры не прошли схему, представление упало. */
+export class QueryFailedError extends Error {
+  constructor(
+    readonly key: string,
+    readonly code: string,
+    message: string
+  ) {
+    super(message)
+    this.name = 'QueryFailedError'
+  }
 }
 
 /** Чтение вне рендера того, чего у клиента нет: прочитать при рисовании или загрузить явно (`load`). */
@@ -77,7 +91,21 @@ interface NextBatch {
 
 interface ApplyResultParams {
   query: Query
-  result: QueryResult
+  result: Exclude<QueryResult, QueryResults.Failure>
+  change: ClientChange
+}
+
+interface ApplyAnswerParams {
+  batch: QueryBatch
+  answer: QueryAnswer
+  /** Исходные запросы пакета по ключам — до склейки `get`. */
+  origins: Map<string, Query>
+}
+
+interface ApplyFailureParams {
+  query: Query
+  error: QueryError
+  origins: Map<string, Query>
   change: ClientChange
 }
 
@@ -110,8 +138,8 @@ export class LiveStore {
   private finds = new Map<string, FindEntry>()
   private counts = new Map<string, CountEntry>()
   private views = new Map<string, ViewEntry>()
-  /** Запросы, загрузка которых не удалась после повторов. */
-  private failures = new Set<string>()
+  /** Запросы, загрузка которых не удалась: пакет — после повторов, запрос — отказом сервера; значение — ошибка. */
+  private failures = new Map<string, Error>()
   private listeners = new Set<(change: ClientChange) => void>()
 
   // loading
@@ -262,10 +290,23 @@ export class LiveStore {
     return entries.map(([id, record]) => track(id, record))
   }
 
-  /** Явная загрузка для обработчика: непокрытое — с сервера, покрытое — сразу; пересинхронизация в пути — снова. */
+  /**
+   * Явная загрузка для обработчика: непокрытое — с сервера, покрытое — сразу; пересинхронизация в пути — снова. Прежний
+   * отказ запроса забывается, новый — ошибка.
+   */
   async load(query: Queries.Find) {
+    const key = keyOf(query)
+
+    this.failures.delete(key)
+
     while (!this.isCovered(query)) {
       await this.request([query])
+
+      const failure = this.failures.get(key)
+
+      if (failure) {
+        throw failure
+      }
     }
 
     return this.read(query) as object[]
@@ -322,7 +363,8 @@ export class LiveStore {
 
   /**
    * Отправка накопленного одним пакетом; `get` одной коллекции склеиваются в один список id. Итог пакета пишется в наборы
-   * того состояния, в котором он ушёл: у нового состояния они свои.
+   * того состояния, в котором он ушёл: у нового состояния они свои. Отказ пакета — отказ всех его запросов; отказ
+   * запроса сервером ставит ответ (`applyAnswer`).
    */
   private async flush(queries: Map<string, Query>) {
     const keys = [...queries.keys()]
@@ -330,12 +372,12 @@ export class LiveStore {
     const { inflight, failures } = this
 
     this.nextBatch = null
+    keys.forEach((key) => failures.delete(key))
 
     try {
-      await this.send(batch)
-      keys.forEach((key) => failures.delete(key))
+      await this.send(batch, queries)
     } catch (error) {
-      keys.forEach((key) => failures.add(key))
+      keys.forEach((key) => failures.set(key, error as Error))
       throw error
     } finally {
       keys.forEach((key) => inflight.delete(key))
@@ -346,14 +388,14 @@ export class LiveStore {
    * Пакет на сервер с повторами и ответ в хранилище. Пока пакет шёл, клиент мог забыть всё: такой ответ снят с прежнего
    * состояния и не кладётся, а его отказ уже никому не нужен.
    */
-  private async send(batch: QueryBatch) {
+  private async send(batch: QueryBatch, origins: Map<string, Query> = new Map()) {
     const { generation } = this
 
     try {
       const answer = await withRetries(() => this.transport.query(batch), this.retries)
 
       if (generation === this.generation) {
-        this.applyAnswer(batch, answer)
+        this.applyAnswer({ batch, answer, origins })
       }
     } catch (error) {
       if (generation === this.generation) {
@@ -366,13 +408,41 @@ export class LiveStore {
    * Ответ в хранилище. Склейка ответа с событиями, пришедшими в другом порядке, — известная проблема первой версии:
    * ответ кладётся как есть.
    */
-  private applyAnswer(batch: QueryBatch, answer: QueryAnswer) {
+  private applyAnswer({ batch, answer, origins }: ApplyAnswerParams) {
     const change = emptyChange()
 
     answer.records.forEach((version) => this.put(version, change))
-    batch.queries.forEach((query, i) => this.applyResult({ query, result: answer.results[i], change }))
+
+    batch.queries.forEach((query, i) => {
+      const result = answer.results[i]
+
+      if ('error' in result) {
+        this.applyFailure({ query, error: result.error, origins, change })
+        return
+      }
+
+      this.applyResult({ query, result, change })
+    })
 
     this.notify(change)
+  }
+
+  /**
+   * Отказ запроса сервером: непокрытый запрос становится отказавшим — проход покажет вид ошибки обёртки, `load` бросит;
+   * у покрытого (перезапрос устаревшего) остаётся прежнее значение. Склеенный `get` отказывает за все `get` своей
+   * коллекции из пакета.
+   */
+  private applyFailure({ query, error, origins, change }: ApplyFailureParams) {
+    const sources =
+      query.kind === 'get' ? [...origins].filter(([, origin]) => isSameGet(origin, query)) : []
+    const failed = query.kind === 'get' ? sources : [[keyOf(query), query] as const]
+
+    for (const [key, origin] of failed) {
+      if (!this.isCovered(origin)) {
+        this.failures.set(key, new QueryFailedError(key, error.code, error.message))
+        change.queries.add(key)
+      }
+    }
   }
 
   private applyResult({ query, result, change }: ApplyResultParams) {
@@ -621,7 +691,7 @@ export class LiveStore {
     this.counts.clear()
     this.views.clear()
 
-    this.failures = new Set()
+    this.failures = new Map()
     this.inflight = new Map()
     this.generation += 1
 
@@ -712,6 +782,11 @@ const changedFields = (prev: object, next: object) => {
   const keys = new Set([...Object.keys(prev), ...Object.keys(next)])
 
   return [...keys].filter((key) => !isEqual(prev[key as keyof object], next[key as keyof object]))
+}
+
+/** Исходный `get` вошёл в склеенный: та же коллекция. */
+const isSameGet = (origin: Query, merged: Queries.Get) => {
+  return origin.kind === 'get' && origin.collection === merged.collection
 }
 
 /** `get` одной коллекции — в один запрос со списком id. */

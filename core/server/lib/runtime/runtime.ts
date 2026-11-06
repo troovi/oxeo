@@ -22,6 +22,7 @@ import type {
   Queries,
   Query,
   QueryBatch,
+  QueryError,
   QueryResult,
   RecordVersion,
   ViewContext,
@@ -78,6 +79,12 @@ export interface PartialWrite {
   error: unknown
 }
 
+/** Отказ запроса пакета: сам запрос и ошибка, которую он бросил. */
+export interface QueryFailure {
+  query: Query
+  error: unknown
+}
+
 export interface RuntimeOptions<
   T extends DomainsMap,
   C,
@@ -107,6 +114,11 @@ export interface RuntimeOptions<
   broadcast: (event: DomainEvent) => void
   /** Частичная запись: залогировать и разослать клиентам команду пересинхронизации. */
   onPartialWrite: (info: PartialWrite) => void
+  /**
+   * Отказ одного запроса пакета: клиент получит его результатом `{ error }`, остальные запросы отвечены. Здесь —
+   * залогировать непредвиденное (упавшее представление); по умолчанию — ничего.
+   */
+  onQueryError?: (info: QueryFailure) => void
   /** Документ базы → вид для клиента (например, без служебных `_id`/`__v`). По умолчанию — как есть. */
   serialize?: <D extends object>(document: D) => D
 }
@@ -161,6 +173,15 @@ const parseWith = ({ registry, name, method, params, kind }: ParseWithParams) =>
   }
 
   return parsed.data
+}
+
+/** Отказ запроса для клиента: код и текст `DomainError`, у непредвиденной ошибки — `internal` без подробностей. */
+const queryError = (error: unknown): QueryError => {
+  if (error instanceof DomainError) {
+    return { code: error.code, message: error.message }
+  }
+
+  return { code: 'internal', message: 'Запрос не выполнен' }
 }
 
 /** Связи, по которым ответ захватывает записи вместе с отданной: на один уровень, `HasMany` — нет. */
@@ -326,7 +347,7 @@ export class DomainRuntime<
   /**
    * Пакет запросов клиента — мимо очереди вызовов, поэтому чтение может застать операцию на середине: итоговые версии
    * принесёт её событие. Сначала каждый запрос пакета, затем захват записей, на которые ведут ссылки отданных записей,
-   * на один уровень.
+   * на один уровень. Отказ запроса — его результат `{ error }`: остальные запросы пакета отвечены.
    */
   async query({ queries }: QueryBatch, identity: Identity | null = null) {
     const versions: AnswerVersions = new Map()
@@ -334,13 +355,18 @@ export class DomainRuntime<
     const viewer = { ctx: null as ViewContext<Actor> | null }
 
     for (const item of queries) {
-      if (item.kind === 'view') {
-        viewer.ctx ??= await this.viewContext(identity)
-        results.push(await this.resolveView({ item, identity, ctx: viewer.ctx }))
-        continue
-      }
+      try {
+        if (item.kind === 'view') {
+          viewer.ctx ??= await this.viewContext(identity)
+          results.push(await this.resolveView({ item, identity, ctx: viewer.ctx }))
+          continue
+        }
 
-      results.push(await this.resolve(item, versions))
+        results.push(await this.resolve(item, versions))
+      } catch (error) {
+        this.options.onQueryError?.({ query: item, error })
+        results.push({ error: queryError(error) })
+      }
     }
 
     await this.capture(versions)

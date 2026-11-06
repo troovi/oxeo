@@ -1,6 +1,6 @@
 {
   "name": "@oxeo/scheme",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Схема данных и контракт доменов oxeo: то, на чём пишется общий core проекта",
   "repository": {
     "type": "git",

@@ -20,7 +20,7 @@ import {
   defineCollection,
   schemaOf
 } from '@oxeo/scheme'
-import { DataSource, DomainRuntime, PartialWrite } from '../lib'
+import { DataSource, DomainRuntime, PartialWrite, QueryFailure } from '../lib'
 
 type Source = 'notes' | 'authors'
 
@@ -164,6 +164,13 @@ class NotesViews {
   async broken(params: { noteId: number }) {
     await this.collections.note.remove(params.noteId)
   }
+
+  /** Упавшее представление — непредвиденная ошибка расчёта. */
+  async crash(_params: {}) {
+    const missing = (await this.collections.author.get(404)) as { name: string }
+
+    return missing.name
+  }
 }
 
 export const views = { notes: NotesViews }
@@ -171,7 +178,8 @@ export const views = { notes: NotesViews }
 export const viewParams = createViewsParams<typeof views>({
   notes: {
     summary: schemaOf(NoteEntity).pick({ authorId: true }),
-    broken: schemaOf(NoteEntity).pick({ noteId: true })
+    broken: schemaOf(NoteEntity).pick({ noteId: true }),
+    crash: schemaOf(NoteEntity).pick({})
   }
 })
 
@@ -185,6 +193,7 @@ export const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms)
 export const createRuntime = () => {
   const events: DomainEvent[] = []
   const partial: PartialWrite[] = []
+  const queryErrors: QueryFailure[] = []
   const stream = new Set<(event: DomainEvent) => void>()
   const serverSource = source()
 
@@ -207,8 +216,9 @@ export const createRuntime = () => {
       events.push(clone(event))
       stream.forEach((listener) => listener(clone(event)))
     },
-    onPartialWrite: (info) => partial.push(info)
+    onPartialWrite: (info) => partial.push(info),
+    onQueryError: (info) => queryErrors.push(info)
   })
 
-  return { runtime, serverSource, events, partial, stream }
+  return { runtime, serverSource, events, partial, queryErrors, stream }
 }

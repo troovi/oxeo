@@ -9,7 +9,7 @@ import {
   views,
   type Scheme
 } from '../../server/tests/runtime.fixture'
-import { ClientChange, Tracker, UncoveredReadError, createClient } from '../lib'
+import { ClientChange, QueryFailedError, Tracker, UncoveredReadError, createClient } from '../lib'
 
 /** Клиент над рантаймом: пакеты и вызовы — через копию, как по сети; поток — по подписке. */
 const connectClient = (
@@ -575,5 +575,43 @@ describe('окна find и представления', () => {
     client.resync('сервер: reset')
 
     expect(() => client.views.notes.summary({ authorId: 1 })).toThrow(UncoveredReadError)
+  })
+})
+
+describe('отказ запроса', () => {
+  it('отказ одного запроса — только его ключ; соседи пакета покрыты; повтор забывает отказ', async () => {
+    const fixture = createRuntime()
+    const { client, queries } = connectClient(fixture)
+    const tracker = new Tracker()
+
+    await fixture.runtime.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Аня' } }, null)
+
+    const body = () => {
+      return { authors: client.db.author.all().length, crash: client.views.notes.crash({}) }
+    }
+
+    pass(tracker, body)
+    await client.request([...tracker.needs.values()])
+
+    expect(queries).toHaveLength(1)
+    expect(pass(tracker, body)).toEqual({ authors: 1, crash: null })
+    expect([...tracker.failures]).toEqual(['view:notes.crash:{}'])
+    expect(tracker.needs.size).toBe(0)
+
+    // повтор: отказ забыт — проход снова собирает запрос как потребность
+    client.forgetFailures([...tracker.failures])
+    pass(tracker, body)
+
+    expect(tracker.failures.size).toBe(0)
+    expect(tracker.needs.size).toBe(1)
+  })
+
+  it('load отказавшего запроса бросает QueryFailedError с кодом сервера', async () => {
+    const fixture = createRuntime()
+    const { client } = connectClient(fixture)
+    const missing = client.db as unknown as Record<string, { load: () => Promise<object[]> }>
+
+    await expect(missing.ghost.load()).rejects.toBeInstanceOf(QueryFailedError)
+    await expect(missing.ghost.load()).rejects.toMatchObject({ code: 'notFound' })
   })
 })
