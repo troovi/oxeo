@@ -16,6 +16,19 @@ const TypesTranslator = {
   boolean: Boolean
 }
 
+interface IndexFlags {
+  index?: boolean
+  unique?: boolean
+}
+
+/**
+ * Опции индекса для mongoose — только заданные флаги. Ключ `index` или `unique` со значением `undefined` mongoose
+ * понимает как просьбу об индексе и строит его на каждом поле.
+ */
+const indexOptions = ({ index, unique }: IndexFlags) => {
+  return { ...(index ? { index: true } : {}), ...(unique ? { unique: true } : {}) }
+}
+
 export class DefinitionsFactory<T extends CollectionScheme> {
   constructor(private dataScheme: DataScheme<T>) {}
 
@@ -70,7 +83,7 @@ export class DefinitionsFactory<T extends CollectionScheme> {
           type: Schema.Types.Mixed, // сузить до String и Number
           enum: primitive.values,
           required: !primitive.nullable,
-          index: primitive.index
+          ...indexOptions(primitive)
         }
       }
       case 'enum': {
@@ -84,8 +97,7 @@ export class DefinitionsFactory<T extends CollectionScheme> {
       case 'number': {
         return {
           type: TypesTranslator[primitive.type],
-          unique: primitive.unique,
-          index: primitive.index
+          ...indexOptions(primitive)
         }
       }
       default: {
@@ -106,8 +118,7 @@ export class DefinitionsFactory<T extends CollectionScheme> {
 
         return {
           type: TypesTranslator[refModel.identifier.options.type],
-          index: reference.options?.index,
-          unique: reference.options?.unique,
+          ...indexOptions(reference.options ?? {}),
           required: !nullable
         }
       }
