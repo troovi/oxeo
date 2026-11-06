@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { DomainEvent, RecordVersion } from '@oxeo/scheme'
-import { clone, createJournal, domains, tick, type Scheme } from '../../server/tests/journal.fixture'
+import { clone, createRuntime, domains, tick, type Scheme } from '../../server/tests/runtime.fixture'
 import { ClientChange, Tracker, UncoveredReadError, createClient } from '../lib'
 
-/** Клиент над журналом: пакеты и вызовы — через копию, как по сети; поток — по подписке. */
+/** Клиент над рантаймом: пакеты и вызовы — через копию, как по сети; поток — по подписке. */
 const connectClient = (
-  journal: ReturnType<typeof createJournal>,
+  fixture: ReturnType<typeof createRuntime>,
   onResync?: (reason: string) => void
 ) => {
   const queries: unknown[] = []
@@ -13,10 +13,10 @@ const connectClient = (
     transport: {
       query: async (batch) => {
         queries.push(clone(batch))
-        return clone(await journal.server.query(clone(batch)))
+        return clone(await fixture.runtime.query(clone(batch)))
       },
       call: async ({ domain, method, params }) => {
-        return clone(await journal.server.run({ domain, method, params } as never, 'автор'))
+        return clone(await fixture.runtime.run({ domain, method, params } as never, 'автор'))
       }
     },
     retries: [],
@@ -24,7 +24,7 @@ const connectClient = (
     onResync
   })
 
-  journal.stream.add((event) => client.push(event))
+  fixture.stream.add((event) => client.push(event))
 
   return { client, queries }
 }
@@ -36,11 +36,11 @@ const pass = <R>(tracker: Tracker, body: () => R) => {
 
 describe('createClient', () => {
   it('чтение вне рендера: непокрытое — ошибка, load загружает и делает покрытым', async () => {
-    const journal = createJournal()
-    const { client } = connectClient(journal)
+    const fixture = createRuntime()
+    const { client } = connectClient(fixture)
 
-    await journal.server.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Аня' } }, null)
-    await journal.server.run(
+    await fixture.runtime.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Аня' } }, null)
+    await fixture.runtime.run(
       { domain: 'notes', method: 'add', params: { text: 'a', authorId: 1 } },
       null
     )
@@ -57,12 +57,12 @@ describe('createClient', () => {
   })
 
   it('проход собирает потребности в один пакет, второй проход видит данные', async () => {
-    const journal = createJournal()
-    const { client, queries } = connectClient(journal)
+    const fixture = createRuntime()
+    const { client, queries } = connectClient(fixture)
     const tracker = new Tracker()
 
-    await journal.server.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Аня' } }, null)
-    await journal.server.run(
+    await fixture.runtime.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Аня' } }, null)
+    await fixture.runtime.run(
       { domain: 'notes', method: 'add', params: { text: 'a', authorId: 1 } },
       null
     )
@@ -87,14 +87,14 @@ describe('createClient', () => {
   })
 
   it('чужие изменения: подходящая запись входит в запрос, переставшая — выходит, удалённая — пропадает', async () => {
-    const journal = createJournal()
-    const { client } = connectClient(journal)
+    const fixture = createRuntime()
+    const { client } = connectClient(fixture)
     const changes: ClientChange[] = []
 
     client.subscribe((change) => changes.push(change))
 
-    await journal.server.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Аня' } }, null)
-    await journal.server.run(
+    await fixture.runtime.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Аня' } }, null)
+    await fixture.runtime.run(
       { domain: 'notes', method: 'add', params: { text: 'a', authorId: 1 } },
       null
     )
@@ -102,16 +102,16 @@ describe('createClient', () => {
     await client.data.note.load({ status: 'draft' })
 
     // смена 2 создаётся черновиком — входит; смена 1 опубликована — выходит
-    await journal.server.run(
+    await fixture.runtime.run(
       { domain: 'notes', method: 'add', params: { text: 'b', authorId: 1 } },
       null
     )
-    await journal.server.run({ domain: 'notes', method: 'publish', params: { noteId: 1 } }, null)
+    await fixture.runtime.run({ domain: 'notes', method: 'publish', params: { noteId: 1 } }, null)
     await tick()
 
     expect(client.data.note.find({ status: 'draft' }).map((note) => note.noteId)).toEqual([2])
 
-    await journal.server.run({ domain: 'notes', method: 'remove', params: { noteId: 2 } }, null)
+    await fixture.runtime.run({ domain: 'notes', method: 'remove', params: { noteId: 2 } }, null)
     await tick()
 
     expect(client.data.note.find({ status: 'draft' })).toEqual([])
@@ -120,42 +120,42 @@ describe('createClient', () => {
   })
 
   it('свой вызов: результат после применения, записи события сохраняются', async () => {
-    const journal = createJournal()
-    const { client } = connectClient(journal)
+    const fixture = createRuntime()
+    const { client } = connectClient(fixture)
 
     const authorId = await client.DomainsAPI.notes.addAuthor({ name: 'Аня' })
 
     expect(authorId).toBe(1)
     expect(client.data.author.get(1)?.name).toBe('Аня')
     // чужой вызов: запись никто не ждёт — клиент её не держит
-    await journal.server.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Боря' } }, null)
+    await fixture.runtime.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Боря' } }, null)
     await tick()
 
     expect(() => client.data.author.get(2)).toThrow(UncoveredReadError)
   })
 
   it('счётчик перезапрашивается после изменений коллекции', async () => {
-    const journal = createJournal()
-    const { client } = connectClient(journal)
+    const fixture = createRuntime()
+    const { client } = connectClient(fixture)
 
-    await journal.server.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Аня' } }, null)
+    await fixture.runtime.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Аня' } }, null)
     await client.request([{ kind: 'count', collection: 'author', where: null }])
 
     expect(client.data.author.count()).toBe(1)
 
-    await journal.server.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Боря' } }, null)
+    await fixture.runtime.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Боря' } }, null)
     await tick(20)
 
     expect(client.data.author.count()).toBe(2)
   })
 
   it('пересинхронизация забывает всё и будит всех подписчиков', async () => {
-    const journal = createJournal()
+    const fixture = createRuntime()
     const reasons: string[] = []
-    const { client } = connectClient(journal, (reason) => reasons.push(reason))
+    const { client } = connectClient(fixture, (reason) => reasons.push(reason))
     const tracker = new Tracker()
 
-    await journal.server.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Аня' } }, null)
+    await fixture.runtime.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Аня' } }, null)
     await client.data.author.load()
 
     pass(tracker, () => client.data.author.all())
@@ -171,8 +171,8 @@ describe('createClient', () => {
   })
 
   it('then и символы не становятся вызовами и коллекциями', async () => {
-    const journal = createJournal()
-    const { client } = connectClient(journal)
+    const fixture = createRuntime()
+    const { client } = connectClient(fixture)
 
     await expect(Promise.resolve(client.DomainsAPI)).resolves.toBe(client.DomainsAPI)
     await expect(Promise.resolve(client.data)).resolves.toBe(client.data)

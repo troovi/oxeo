@@ -1,12 +1,15 @@
 import { z } from 'zod'
 import { Collections } from '../../../lib/scheme'
-import { DomainContext, invariant, notFound } from '../context'
+import { DomainContext, DomainIds, invariant, notFound } from '../context'
 import { AppScheme } from '../../scheme'
 import { ClientsParams } from './clients.params'
 import { WorkersDomain } from '../workers/workers.domain'
 
 export class ClientsDomain {
-  constructor(private collections: Collections<AppScheme>) {}
+  constructor(
+    private collections: Collections<AppScheme>,
+    private ids: DomainIds
+  ) {}
 
   // ------------------------------------------- operations --------------------------------------------
 
@@ -18,7 +21,7 @@ export class ClientsDomain {
       throw invariant('Менеджер клиента — работающий офисный сотрудник')
     }
 
-    const clientId = await ctx.ids.number('client')
+    const clientId = await this.ids.number('client')
 
     await this.collections.client.create({
       clientId,

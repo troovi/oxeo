@@ -10,7 +10,7 @@ export interface CounterRecord<Source extends string = string> {
 
 /** Коллекция счётчиков числовых идентификаторов с идентификатором `source` — подходит коллекция oxeo. */
 export interface CounterCollection<Source extends string = string> {
-  exists(source: Source): boolean | Promise<boolean>
+  exists(source: Source): Promise<boolean>
   create(record: CounterRecord<Source>): Promise<boolean>
   update(source: Source, mutate: (draft: CounterRecord<Source>) => void): Promise<boolean>
 }

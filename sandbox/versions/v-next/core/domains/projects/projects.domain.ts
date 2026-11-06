@@ -1,12 +1,15 @@
 import { z } from 'zod'
 import { Collections } from '../../../lib/scheme'
-import { DomainContext, invariant, notFound } from '../context'
+import { DomainContext, DomainIds, invariant, notFound } from '../context'
 import { AppScheme } from '../../scheme'
 import { ProjectsParams } from './projects.params'
 import { WorkersDomain } from '../workers/workers.domain'
 
 export class ProjectsDomain {
-  constructor(private collections: Collections<AppScheme>) {}
+  constructor(
+    private collections: Collections<AppScheme>,
+    private ids: DomainIds
+  ) {}
 
   // ------------------------------------------- operations --------------------------------------------
 
@@ -30,7 +33,7 @@ export class ProjectsDomain {
       }
     }
 
-    const projectId = await ctx.ids.number('project')
+    const projectId = await this.ids.number('project')
 
     await this.collections.project.create({
       projectId,

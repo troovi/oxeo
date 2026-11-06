@@ -305,7 +305,7 @@ export class DataScheme<T extends CollectionScheme> {
 
   /**
    * Связи записи модели по адресам: общие и, у дискриминированной модели, связи формы записи. Нужны всем, кто идёт по
-   * ссылкам записи: проверкам и каскадам `DataProcessor`, захвату ссылок журналом.
+   * ссылкам записи: проверкам и каскадам `DataProcessor`, захвату ссылок рантаймом доменов.
    */
   referencesOf(model: string, data: object): TargetReferencesStore {
     const { refscheme, scheme } = this.models[model]

@@ -114,7 +114,7 @@ export const createClient = <Scheme extends CollectionScheme, Domains extends Do
   return {
     data,
     DomainsAPI,
-    /** Событие журнала из потока. */
+    /** Событие из потока. */
     push: (event: DomainEvent) => {
       store.push(event)
     },

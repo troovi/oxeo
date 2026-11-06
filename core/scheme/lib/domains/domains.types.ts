@@ -7,12 +7,10 @@ export interface DomainCall {
   params: unknown
 }
 
-/** Реестр доменов: ключ — имя в маршруте, значение — класс с конструктором `(collections)`. */
+/** Реестр доменов: ключ — имя в маршруте, значение — класс с конструктором `(collections, ids)`. */
 export interface DomainsMap {
-  [domain: string]: new (collections: any) => object
+  [domain: string]: new (collections: any, ids: any) => object
 }
-
-export type DomainServices<T extends DomainsMap> = { [K in keyof T]: InstanceType<T[K]> }
 
 /** Маршруты доменов из сигнатур: метод → `{ params, answer }`, контекст в маршрут не входит. */
 export type DomainRoutes<T extends DomainsMap> = {
@@ -26,7 +24,7 @@ export type DomainRoutes<T extends DomainsMap> = {
   }
 }
 
-/** Маршруты HTTP: ответ сервера — событие журнала с результатом метода. */
+/** Маршруты HTTP: ответ сервера — событие с результатом метода. */
 export type DomainApiRoutes<T extends DomainsMap> = {
   [D in keyof T]: {
     [M in keyof DomainRoutes<T>[D]]: {

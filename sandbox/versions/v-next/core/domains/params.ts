@@ -1,22 +1,16 @@
 /**
- * Схемы параметров операций по реестру — для проверки тела запроса на сервере. Клиент этот файл не
+ * Схемы параметров операций по реестру: рантайм проверяет ими каждый вызов. Клиент этот файл не
  * импортирует: домены берут из `*.params.ts` только типы, и zod в его сборку не попадает.
  */
-import { z } from 'zod'
-import { AppDomains } from './index'
+import { createDomainsParams } from '../../lib/scheme'
+import type { AppDomains } from './index'
 import { ClientsParams } from './clients/clients.params'
 import { DictionaryParams } from './dictionary/dictionary.params'
 import { ProjectsParams } from './projects/projects.params'
 import { ShiftsParams } from './shifts/shifts.params'
 import { WorkersParams } from './workers/workers.params'
 
-type DomainParams = {
-  [D in keyof AppDomains]: {
-    [M in keyof InstanceType<AppDomains[D]>]: z.ZodObject
-  }
-}
-
-export const domainParams: DomainParams = {
+export const appParams = createDomainsParams<AppDomains>({
   dictionary: {
     ensureDictionaries: DictionaryParams.EnsureDictionaries,
     addOption: DictionaryParams.AddOption,
@@ -46,4 +40,4 @@ export const domainParams: DomainParams = {
     complete: ShiftsParams.Complete,
     cancel: ShiftsParams.Cancel
   }
-}
+})

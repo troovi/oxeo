@@ -20,17 +20,18 @@ project/
     scheme.ts            модели и DataScheme
     domains/
       index.ts           реестр доменов
+      params.ts          реестр схем параметров — рантайму
       <name>/
         <name>.domain.ts операции
         <name>.params.ts параметры операций на zod
-  server/                серверное приложение: журнал, драйвер базы, маршруты
+  server/                серверное приложение: рантайм доменов, драйвер базы, маршруты
   client/                клиентское приложение: клиент oxeo, компоненты
 ```
 
 | Часть    | Что в ней                                 | Как использует `core` | Пакеты oxeo                           |
 | -------- | ----------------------------------------- | --------------------- | ------------------------------------ |
 | `core`   | схемы, домены, параметры операций         | —                     | `@oxeo/scheme`                         |
-| `server` | журнал, драйвер базы, маршруты, транспорт | исполняет в рантайме  | `@oxeo/server`, драйвер базы           |
+| `server` | рантайм, драйвер, маршруты, транспорт     | исполняет в рантайме  | `@oxeo/server`, драйвер базы           |
 | `client` | клиент oxeo, компоненты, экраны            | **только типы**       | `@oxeo/client`, привязка (`@oxeo/react`) |
 
 Главное правило структуры: клиент импортирует из `core` только типы, через `import type`. Схемы, реализация доменов и
@@ -82,6 +83,9 @@ export class Note {
   @Prop({ type: 'string' })
   text: string
 
+  @Prop({ type: 'number' })
+  createdAt: number
+
   @ReferenceTo(() => Author)
   authorId: Author['authorId']
 }
@@ -95,18 +99,22 @@ export const dataScheme = new DataScheme({
 export type AppScheme = InferScheme<typeof dataScheme>
 ```
 
-Домен — класс, который получает только коллекции. Отказ — `DomainError`, идентификаторы и момент вызова приходят в
-контексте.
+Домен — класс над своим окружением. Коллекции и выдача идентификаторов одни на все вызовы, поэтому приходят в
+конструктор. То, что у каждого вызова своё, — актор, момент и дата — приходит вторым аргументом метода, контекстом.
+Метод, которому контекст не нужен, его не объявляет. Отказ — `DomainError`.
 
 ```ts
 // core/domains/notes/notes.domain.ts
-import { Collections, DomainContext, DomainError } from '@oxeo/scheme'
+import { Collections, DomainContext, DomainError, IdSource } from '@oxeo/scheme'
 import { z } from 'zod'
 import { AppScheme } from '../../scheme'
 import { NotesParams } from './notes.params'
 
 export class NotesDomain {
-  constructor(private collections: Collections<AppScheme>) {}
+  constructor(
+    private collections: Collections<AppScheme>,
+    private ids: IdSource
+  ) {}
 
   /** Новая заметка автора; возвращает её номер. */
   async add(params: z.infer<typeof NotesParams.Add>, ctx: DomainContext) {
@@ -114,9 +122,9 @@ export class NotesDomain {
       throw new DomainError('notFound', 'Автор не найден')
     }
 
-    const noteId = await ctx.ids.number('notes')
+    const noteId = await this.ids.number('notes')
 
-    await this.collections.note.create({ noteId, ...params })
+    await this.collections.note.create({ noteId, createdAt: ctx.at, ...params })
 
     return noteId
   }
@@ -124,7 +132,8 @@ export class NotesDomain {
 ```
 
 Параметры операций выводятся из моделей через `schemaOf`, реестр доменов и его тип экспортируются из
-`core/domains/index.ts`.
+`core/domains/index.ts`. Схемы собираются в реестр `createDomainsParams`: по типу доменов он знает все публичные методы,
+поэтому компилятор не пропустит метод без схемы, лишний метод и схему не того типа.
 
 ```ts
 // core/domains/notes/notes.params.ts
@@ -139,24 +148,41 @@ export namespace NotesParams {
 export const appDomains = { notes: NotesDomain }
 
 export type AppDomains = typeof appDomains
+
+// core/domains/params.ts
+import { createDomainsParams } from '@oxeo/scheme'
+import type { AppDomains } from './index'
+import { NotesParams } from './notes/notes.params'
+
+export const appParams = createDomainsParams<AppDomains>({
+  notes: { add: NotesParams.Add }
+})
 ```
 
 ## server
 
-Сервер собирает `DataSource` над драйвером и журнал над доменами. Журнал выполняет вызовы строго по одному, рассылает
-события всем клиентам и отвечает на пакеты запросов. Фреймворк и транспорт — забота приложения: `shell.run` и
-`shell.query` вешаются на свои маршруты, `broadcast` уходит в свой поток событий.
+Сервер собирает `DataSource` над драйвером и `DomainRuntime` над доменами. Рантайм выполняет вызовы строго по одному,
+рассылает события всем клиентам и отвечает на пакеты запросов. Фреймворк и транспорт — забота приложения: `runtime.run` и
+`runtime.query` вешаются на свои маршруты, `broadcast` уходит в свой поток событий.
+
+Параметры каждого вызова проверяет сам рантайм, поэтому маршруту проверять их не нужно. Операции нет в реестре схем —
+`DomainError` с кодом `notFound`, параметры не прошли — `ParamsError` с `issues`. Перевести отказ в ответ — забота
+приложения.
 
 ```ts
-// server/journal.ts
+// server/runtime.ts
 import { createMongoDriver } from '@oxeo-drivers/mongo'
-import { DataSource, createServerShell } from '@oxeo/server'
+import { DataSource, DomainRuntime } from '@oxeo/server'
 import { appDomains } from '../core/domains'
+import { appParams } from '../core/domains/params'
 import { dataScheme } from '../core/scheme'
 
 const source = new DataSource(dataScheme, { createDriver: createMongoDriver({ connection }) })
 
-export const shell = createServerShell(appDomains, source, {
+export const runtime = new DomainRuntime({
+  domains: appDomains,
+  params: appParams,
+  dataSource: source,
   counterCollection: 'counter',
   resolveActor: (identity) => resolveActor(identity),
   today: (at) => toDateISO(at),
@@ -216,8 +242,8 @@ await DomainsAPI.notes.add({ text, authorId })
 | Папка            | Пакет                         | Что в нём                                                                            | Кто берёт                    |
 | ---------------- | ----------------------------- | ------------------------------------------------------------------------------------ | ---------------------------- |
 | `core/scheme`    | `@oxeo/scheme`        | декораторы, `DataScheme`, `schemaOf`, контракт доменов и коллекций, фильтр, протокол | `core`; клиент — только типы |
-| `core/server`    | `@oxeo/server`        | `DataSource`, `DataProcessor`, журнал `createServerShell`, договор драйвера          | сервер                       |
-| `core/client`    | `@oxeo/client`        | живая часть базы, чтения, пакеты запросов, события журнала, вызовы операций          | клиент                       |
+| `core/server`    | `@oxeo/server`        | `DataSource`, `DataProcessor`, `DomainRuntime`, договор драйвера                     | сервер                       |
+| `core/client`    | `@oxeo/client`        | живая часть базы, чтения, пакеты запросов, события, вызовы операций                  | клиент                       |
 | `core/react`     | `@oxeo/react`         | `createObserver`, `createUseData`                                                    | клиент на React              |
 | `core/types`     | `@oxeo/types`         | типы HTTP-маршрутов и файлов                                                         | приложения                   |
 | `drivers/mongo`  | `@oxeo-drivers/mongo`  | драйвер MongoDB, модуль NestJS                                                       | сервер                       |

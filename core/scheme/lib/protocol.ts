@@ -1,9 +1,9 @@
 /**
- * Протокол между клиентом и сервером: запросы и их пакет, ответ на пакет, событие журнала. Фильтр запросов — `Where`
+ * Протокол между клиентом и сервером: запросы и их пакет, ответ на пакет, событие. Фильтр запросов — `Where`
  * коллекций oxeo: сервер выполняет запрос через коллекции, клиент тем же фильтром сверяет записи событий (`matches`).
  */
 import type { IType } from './core/types/collections.types'
-import type { EventContext } from './domains/context'
+import type { DomainContext } from './domains/context'
 
 // queries
 
@@ -69,12 +69,12 @@ export interface QueryAnswer {
   results: QueryResult[]
 }
 
-// journal
+// events
 
 /**
- * Событие журнала. Вызов (`domain`, `method`, `params`) и `ctx` — для журнала и подписчиков на сервере, `result` —
- * вызывающему, `changes` — новые версии всех записей, которые затронула операция: реплика применяет только их. `epoch`
- * — запуск сервера, `revision` — порядок.
+ * Событие операции. Вызов (`domain`, `method`, `params`) и `ctx` — для подписчиков на сервере, `result` — вызывающему,
+ * `changes` — новые версии всех записей, которые затронула операция: реплика применяет только их. `epoch` — запуск
+ * сервера, `revision` — порядок.
  */
 export interface DomainEvent<R = unknown> {
   epoch: string
@@ -82,7 +82,7 @@ export interface DomainEvent<R = unknown> {
   domain: string
   method: string
   params: unknown
-  ctx: EventContext
+  ctx: DomainContext
   result: R
   changes: RecordVersion[]
 }

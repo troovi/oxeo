@@ -163,12 +163,6 @@ export class MemoryTableDriver<T extends CollectionScheme> implements TableDrive
     })
   }
 
-  bootstrap(tables: { [tableName: string]: TableRow[] }) {
-    for (const tableName in tables) {
-      this.tables[tableName].initialize(tables[tableName])
-    }
-  }
-
   async createRecord(row: RelationRecord) {
     if (__DEV__) {
       xRay.print('TABLE:ADD-RECORD', styles.pink)(row)

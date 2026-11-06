@@ -6,7 +6,7 @@
 import { DomainRoutes } from '../lib/scheme'
 import { AppKey, AppKeys } from '../core/keys'
 import { AppDomains } from '../core/domains'
-import { JournalService } from './journal.service'
+import { RuntimeService } from './runtime.service'
 
 type Routes = DomainRoutes<AppDomains>
 
@@ -116,7 +116,7 @@ const createRandom = (seed: number) => {
   }
 }
 
-export const seed = async (shell: JournalService['shell']) => {
+export const seed = async (runtime: RuntimeService['runtime']) => {
   const random = createRandom(2026)
 
   const pick = <T>(items: T[]) => {
@@ -145,7 +145,7 @@ export const seed = async (shell: JournalService['shell']) => {
     call: Call<D, M>,
     moment = (at += HOUR)
   ) => {
-    const event = await shell.run(call, null, { at: moment })
+    const event = await runtime.run(call, null, { at: moment })
 
     return event.result
   }

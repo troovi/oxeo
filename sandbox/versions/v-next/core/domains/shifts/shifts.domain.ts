@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { Collections, sortById } from '../../../lib/scheme'
-import { DomainContext, invariant, notFound } from '../context'
+import { DomainContext, DomainIds, invariant, notFound } from '../context'
 import { AppScheme, ShiftEntities } from '../../scheme'
 import { ProjectsDomain } from '../projects/projects.domain'
 import { WorkersDomain } from '../workers/workers.domain'
@@ -10,7 +10,10 @@ import { ShiftsParams } from './shifts.params'
 const MANAGER_RATE_FACTOR = 1.5
 
 export class ShiftsDomain {
-  constructor(private collections: Collections<AppScheme>) {}
+  constructor(
+    private collections: Collections<AppScheme>,
+    private ids: DomainIds
+  ) {}
 
   // ------------------------------------------- operations --------------------------------------------
 
@@ -25,7 +28,7 @@ export class ShiftsDomain {
       throw invariant('Смены создаются только у активного проекта')
     }
 
-    const shiftId = await ctx.ids.number('shift')
+    const shiftId = await this.ids.number('shift')
 
     await this.collections.shift.create({
       shiftId,
@@ -87,7 +90,7 @@ export class ShiftsDomain {
       throw invariant('Сотрудник уже в составе смены')
     }
 
-    const participantId = ctx.ids.string('participant')
+    const participantId = this.ids.string('participant')
 
     await this.collections.participant.create({
       participantId,

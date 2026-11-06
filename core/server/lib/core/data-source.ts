@@ -3,21 +3,21 @@ import { xRay } from '../utils/x-ray'
 import { __DEV__ } from '../utils'
 
 import { CollectionWrite, DataProcessor } from './data-processor'
-import { AppCollectionDriver } from './types/driver.types'
+import { CollectionDriver } from './types/driver.types'
 
 type CollectionApiShape = {
   [K in keyof CollectionApi]: (...params: Parameters<CollectionApi[K]>) => unknown
 }
 
-interface DataSourceOptions<Scheme extends CollectionScheme, Driver extends AppCollectionDriver> {
+interface DataSourceOptions<Scheme extends CollectionScheme, Driver extends CollectionDriver> {
   createDriver: (dataScheme: DataScheme<Scheme>) => Driver
 }
 
 // prettier-ignore
-export class DataSource<Scheme extends CollectionScheme, Driver extends AppCollectionDriver = AppCollectionDriver> {
+export class DataSource<Scheme extends CollectionScheme, Driver extends CollectionDriver = CollectionDriver> {
   public driver: Driver
   public scheme: DataScheme<Scheme>
-  public collections = {} as Collections<Scheme, Driver['type']>
+  public collections = {} as Collections<Scheme>
 
   private writeListeners = new Set<(write: CollectionWrite) => void>()
 
@@ -91,7 +91,7 @@ export class DataSource<Scheme extends CollectionScheme, Driver extends AppColle
   /**
    * Слушатель записей в базу: каждая запись коллекции (`create`, `update`, `remove`, `replace`), которую делает
    * `DataProcessor`, — модель и id, до выполнения запросов к драйверу. Не зависит от драйвера; строки таблиц связей не
-   * сообщаются. Так журнал узнаёт, какие записи тронула операция.
+   * сообщаются. Так рантайм доменов узнаёт, какие записи тронула операция.
    */
   subscribeWrites(listener: (write: CollectionWrite) => void) {
     this.writeListeners.add(listener)

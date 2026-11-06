@@ -14,12 +14,6 @@ export class IndexedCollectionStore<T> {
     this.identifierKey = info.identifierKey
   }
 
-  initialize(items: T[]) {
-    items.forEach((item) => {
-      this.create(item)
-    })
-  }
-
   get(id: IType) {
     return this.store[id] ?? null
   }

@@ -40,7 +40,7 @@ export const Screen = () => {
   )
 }
 
-/** Подпись записи Networks: событие журнала — ревизией и методом домена, пакет запросов — его запросами. */
+/** Подпись записи Networks: событие — ревизией и методом домена, пакет запросов — его запросами. */
 const summaryOf = (entry: NetworkEntry) => {
   if (entry.kind === 'message' && entry.event === 'event') {
     const event = entry.data as DomainEvent

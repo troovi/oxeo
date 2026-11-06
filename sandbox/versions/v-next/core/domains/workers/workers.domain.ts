@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { Collections } from '../../../lib/scheme'
-import { DomainContext, invariant, notFound } from '../context'
+import { DomainContext, DomainIds, invariant, notFound } from '../context'
 import { AppScheme, WorkerEntities } from '../../scheme'
 import { DictionaryDomain } from '../dictionary/dictionary.domain'
 import { WorkersParams } from './workers.params'
@@ -12,7 +12,10 @@ interface DictionaryFields {
 }
 
 export class WorkersDomain {
-  constructor(private collections: Collections<AppScheme>) {}
+  constructor(
+    private collections: Collections<AppScheme>,
+    private ids: DomainIds
+  ) {}
 
   // ------------------------------------------- operations --------------------------------------------
 
@@ -23,7 +26,7 @@ export class WorkersDomain {
   async createOffice(params: z.infer<typeof WorkersParams.CreateOffice>, ctx: DomainContext) {
     await this.expectDictionaries(params)
 
-    const workerId = await ctx.ids.number('worker')
+    const workerId = await this.ids.number('worker')
 
     await this.collections.worker.create({
       workerId,
@@ -47,7 +50,7 @@ export class WorkersDomain {
   async createRevisor(params: z.infer<typeof WorkersParams.CreateRevisor>, ctx: DomainContext) {
     await this.expectDictionaries(params)
 
-    const workerId = await ctx.ids.number('worker')
+    const workerId = await this.ids.number('worker')
 
     await this.collections.worker.create({
       workerId,

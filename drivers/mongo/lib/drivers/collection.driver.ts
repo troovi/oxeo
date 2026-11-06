@@ -1,5 +1,5 @@
 import { CollectionScheme, DataScheme, ExtractType } from '@oxeo/scheme'
-import { CollectionDriverAsync, CollectionDriverParams } from '@oxeo/server'
+import { CollectionDriver, CollectionDriverParams } from '@oxeo/server'
 import { MongoRelationsTable } from './table.driver'
 import { Connection, Model, Schema } from 'mongoose'
 import { DefinitionsFactory } from '../factories/definitions.factory'
@@ -23,9 +23,7 @@ export interface MongoDriverOptions {
   dev?: boolean
 }
 
-export class MongoCollectionDriver<Scheme extends CollectionScheme> implements CollectionDriverAsync {
-  readonly type = 'async'
-
+export class MongoCollectionDriver<Scheme extends CollectionScheme> implements CollectionDriver {
   private dev = false
   private onClenupCallbacks: { [model: string]: ((data: any) => void)[] } = {}
   private collections: { [model: string]: Model<any> } = {}

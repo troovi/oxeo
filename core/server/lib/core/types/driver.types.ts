@@ -1,4 +1,4 @@
-import { IType, Promisify } from '@oxeo/scheme'
+import { IType } from '@oxeo/scheme'
 
 export namespace PatchActions {
   interface BasePatch {
@@ -59,33 +59,22 @@ export namespace CollectionDriverParams {
   }
 }
 
-interface CollectionDriverSyncApis {
+export interface CollectionDriver {
+  tables: TableDriver
   // getters (public)
-  getAll: (params: CollectionDriverParams.Model) => object[]
-  get: (params: CollectionDriverParams.Record) => object | null
-  exists: (params: CollectionDriverParams.Record) => boolean
-  findOneBy: (params: CollectionDriverParams.Filter) => object | null
-  findBy: (params: CollectionDriverParams.Filter) => object[]
-  existsBy: (filter: CollectionDriverParams.Filter) => boolean
-  count: (params: CollectionDriverParams.Count) => number
+  getAll: (params: CollectionDriverParams.Model) => Promise<object[]>
+  get: (params: CollectionDriverParams.Record) => Promise<object | null>
+  exists: (params: CollectionDriverParams.Record) => Promise<boolean>
+  findOneBy: (params: CollectionDriverParams.Filter) => Promise<object | null>
+  findBy: (params: CollectionDriverParams.Filter) => Promise<object[]>
+  existsBy: (filter: CollectionDriverParams.Filter) => Promise<boolean>
+  count: (params: CollectionDriverParams.Count) => Promise<number>
   // setters (private - cannot be accesed from dataSource level)
-  create: (params: CollectionDriverParams.Create) => void
-  remove: (params: CollectionDriverParams.Record) => void
-  update: (params: CollectionDriverParams.Update) => void
-  replace: (params: CollectionDriverParams.Replace) => void
+  create: (params: CollectionDriverParams.Create) => Promise<void>
+  remove: (params: CollectionDriverParams.Record) => Promise<void>
+  update: (params: CollectionDriverParams.Update) => Promise<void>
+  replace: (params: CollectionDriverParams.Replace) => Promise<void>
 }
-
-export interface CollectionDriverSync extends CollectionDriverSyncApis {
-  type: 'sync'
-  tables: TableDriver
-}
-
-export interface CollectionDriverAsync extends Promisify<CollectionDriverSyncApis> {
-  type: 'async'
-  tables: TableDriver
-}
-
-export type AppCollectionDriver = CollectionDriverSync | CollectionDriverAsync
 
 export interface TableRow {
   m1: IType

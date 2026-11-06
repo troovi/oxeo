@@ -15,7 +15,3 @@ export type TargetHost = {
 }
 
 export type DeepPartial<T> = { [P in keyof T]?: DeepPartial<T[P]> }
-
-export type Promisify<Apis extends { [K in keyof Apis]: (params: any) => any }> = {
-  [api in keyof Apis]: (...params: Parameters<Apis[api]>) => Promise<ReturnType<Apis[api]>>
-}

@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { Collections } from '../../../lib/scheme'
 import { AppKey, AppKeys } from '../../keys'
 import { AppScheme, DictionaryEntities } from '../../scheme'
-import { DomainContext, invariant, notFound } from '../context'
+import { DomainContext, DomainIds, invariant, notFound } from '../context'
 import { DictionaryParams } from './dictionary.params'
 
 interface OptionsCheck {
@@ -22,7 +22,10 @@ const DICTIONARY_NAMES: Record<AppKey.Dictionary, string> = {
  * одиночная ссылка становится `null`. Названия значений словаря уникальны без учёта регистра.
  */
 export class DictionaryDomain {
-  constructor(private collections: Collections<AppScheme>) {}
+  constructor(
+    private collections: Collections<AppScheme>,
+    private ids: DomainIds
+  ) {}
 
   // ------------------------------------------- operations --------------------------------------------
 
@@ -49,14 +52,14 @@ export class DictionaryDomain {
   }
 
   /** Новое значение словаря; название уникально в словаре. Возвращает сгенерированный `value`. */
-  async addOption(params: z.infer<typeof DictionaryParams.AddOption>, ctx: DomainContext) {
+  async addOption(params: z.infer<typeof DictionaryParams.AddOption>) {
     const options = await this.collections.option.findBy({ dictionary: params.dictionary })
 
     if (DictionaryDomain.hasTitle(options, params.title)) {
       throw invariant(`Значение «${params.title}» уже есть в справочнике`)
     }
 
-    const value = ctx.ids.string('option')
+    const value = this.ids.string('option')
 
     await this.collections.option.create({
       value,

@@ -1,4 +1,5 @@
 export * from './context'
 export * from './domains.types'
 export * from './error'
+export * from './params'
 export * from './patch'

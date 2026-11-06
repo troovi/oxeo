@@ -1,15 +1,18 @@
 /**
- * Контекст вызова домена песочницы: актор — сотрудник (или `null` — система), источники нумерации —
- * счётчики `counter`. Выдача идентификаторов — библиотека.
+ * Контекст вызова домена песочницы: актор — сотрудник (или `null` — система). Источники нумерации —
+ * счётчики `counter`, выдача идентификаторов — библиотека.
  */
-import { DomainContext as OxeoDomainContext, DomainError } from '../../lib/scheme'
+import { DomainContext as OxeoDomainContext, DomainError, IdSource } from '../../lib/scheme'
 import { AppKey } from '../keys'
 
 export interface Actor {
   workerId: number
 }
 
-export type DomainContext = OxeoDomainContext<Actor, AppKey.CounterSource>
+export type DomainContext = OxeoDomainContext<Actor>
+
+/** Выдача идентификаторов — окружение домена. */
+export type DomainIds = IdSource<AppKey.CounterSource>
 
 export type DomainErrorCode = 'notFound' | 'invariant'
 

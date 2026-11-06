@@ -10,7 +10,7 @@ import {
   PropertyMap,
   TargetReferencesStore
 } from '@oxeo/scheme'
-import { AppCollectionDriver } from './types/driver.types'
+import { CollectionDriver } from './types/driver.types'
 import { changesTracker } from './changes-tracker'
 import { styles, xRay } from '../utils/x-ray'
 import { DriverQuery, createQueryBuilder } from './helpers/query-builder'
@@ -34,7 +34,7 @@ const isUniqe = (items: (string | number)[]) => {
 export class DataProcessor<T extends CollectionScheme> {
   constructor(
     private dataScheme: DataScheme<T>,
-    private driver: AppCollectionDriver,
+    private driver: CollectionDriver,
     private onWrite: (write: CollectionWrite) => void = () => {}
   ) {}
 

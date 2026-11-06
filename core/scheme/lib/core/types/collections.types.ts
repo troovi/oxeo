@@ -3,32 +3,20 @@
  * лежат в общем `core` и пишутся без серверных пакетов, реализацию даёт `DataSource` пакета `@oxeo/server`.
  */
 import { Where } from '../../filter'
-import { ExtractType, Promisify } from '../../utils'
+import { ExtractType } from '../../utils'
 import { CollectionScheme, DiscriminatedMeta } from '../data-scheme'
 
 export type IType = string | number
 
-export interface DriverApiMethods<T = object, I extends IType = IType> {
-  get: (id: I) => T | null
-  getAll: () => T[]
-  findOneBy: (filter: Where<T>) => T | null
-  findBy: (filter: Where<T>) => T[]
-  existsBy: (filter: Where<T>) => boolean
-  exists: (id: I) => boolean
+export interface CollectionApi<T = object, I extends IType = IType> {
+  get: (id: I) => Promise<T | null>
+  getAll: () => Promise<T[]>
+  findOneBy: (filter: Where<T>) => Promise<T | null>
+  findBy: (filter: Where<T>) => Promise<T[]>
+  existsBy: (filter: Where<T>) => Promise<boolean>
+  exists: (id: I) => Promise<boolean>
   /** Число записей по фильтру; без фильтра — всех. */
-  count: (filter?: Where<T>) => number
-}
-
-type DriverApiSync<T = object, I extends IType = IType> = DriverApiMethods<T, I>
-type DriverApiAsync<T = object, I extends IType = IType> = Promisify<DriverApiMethods<T, I>>
-
-export type DriverType = 'sync' | 'async'
-
-// prettier-ignore
-export type DriverApi<T = object,I extends IType = IType, DT extends DriverType = DriverType> = DT extends 'sync' ? DriverApiSync<T, I> : DriverApiAsync<T, I>
-
-// prettier-ignore
-export type CollectionApi<T = object, I extends IType = IType, DT extends DriverType = DriverType> = DriverApi<T, I, DT> & {
+  count: (filter?: Where<T>) => Promise<number>
   // data changing
   update: (id: I, mutate: (model: T) => void) => Promise<boolean>
   create: (model: T) => Promise<boolean>
@@ -61,7 +49,7 @@ type DiscriminatedExtension<C, I extends IType> =
     ? DiscriminatedApi<B, VU, DK, I>
     : unknown
 
-export type Collections<Scheme extends CollectionScheme, DT extends DriverType = DriverType> = {
-  [K in keyof Scheme]: CollectionApi<ExtractType<Scheme[K]['model']>, Scheme[K]['identifierType'], DT> &
+export type Collections<Scheme extends CollectionScheme> = {
+  [K in keyof Scheme]: CollectionApi<ExtractType<Scheme[K]['model']>, Scheme[K]['identifierType']> &
     DiscriminatedExtension<Scheme[K], Scheme[K]['identifierType']>
 }

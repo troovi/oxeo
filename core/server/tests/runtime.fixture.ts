@@ -1,5 +1,5 @@
 /**
- * Общий пример тестов журнала и клиента: маленькая схема заметок, домен и журнал над in-memory драйвером. Отдельным файлом
+ * Общий пример тестов рантайма и клиента: маленькая схема заметок, домен и рантайм над in-memory драйвером. Отдельным файлом
  * рядом с тестами, а не в `@oxeo/devkit`: его модели попали бы в одно хранилище метаданных с макетной схемой.
  */
 import { createMemoryDriver } from '@oxeo-drivers/memory'
@@ -9,13 +9,16 @@ import {
   DomainContext,
   DomainError,
   DomainEvent,
+  IdSource,
   Identifier,
   Model,
   Prop,
   ReferenceTo,
-  defineCollection
+  createDomainsParams,
+  defineCollection,
+  schemaOf
 } from '@oxeo/scheme'
-import { DataSource, PartialWrite, createServerShell } from '../lib'
+import { DataSource, DomainRuntime, PartialWrite } from '../lib'
 
 type Source = 'notes' | 'authors'
 
@@ -68,18 +71,21 @@ interface Actor {
 }
 
 class NotesDomain {
-  constructor(private collections: Collections<Scheme>) {}
+  constructor(
+    private collections: Collections<Scheme>,
+    private ids: IdSource<Source>
+  ) {}
 
-  async addAuthor(params: { name: string }, ctx: DomainContext<Actor, Source>) {
-    const authorId = await ctx.ids.number('authors')
+  async addAuthor(params: { name: string }) {
+    const authorId = await this.ids.number('authors')
 
     await this.collections.author.create({ authorId, name: params.name })
 
     return authorId
   }
 
-  async add(params: { text: string; authorId: number }, ctx: DomainContext<Actor, Source>) {
-    const noteId = await ctx.ids.number('notes')
+  async add(params: { text: string; authorId: number }, ctx: DomainContext<Actor>) {
+    const noteId = await this.ids.number('notes')
 
     await this.collections.note.create({
       noteId,
@@ -102,18 +108,34 @@ class NotesDomain {
     await this.collections.note.remove(params.noteId)
   }
 
-  async whoami(_params: {}, ctx: DomainContext<Actor, Source>) {
+  async whoami(_params: {}, ctx: DomainContext<Actor>) {
     return { actor: ctx.actor, today: ctx.today }
   }
 
   /** Пишет и падает — частичная запись (номер из счётчика записью не считается). */
-  async addBroken(params: { text: string; authorId: number }, ctx: DomainContext<Actor, Source>) {
+  async addBroken(params: { text: string; authorId: number }, ctx: DomainContext<Actor>) {
     await this.add(params, ctx)
     throw new Error('after write')
+  }
+
+  /** Помощник: `private` в рантайме не виден, закрывает его только отсутствие схемы. */
+  private async hidden() {
+    return 'скрытое'
   }
 }
 
 export const domains = { notes: NotesDomain }
+
+export const params = createDomainsParams<typeof domains>({
+  notes: {
+    addAuthor: schemaOf(AuthorEntity).pick({ name: true }),
+    add: schemaOf(NoteEntity).pick({ text: true, authorId: true }),
+    publish: schemaOf(NoteEntity).pick({ noteId: true }),
+    remove: schemaOf(NoteEntity).pick({ noteId: true }),
+    whoami: schemaOf(NoteEntity).pick({}),
+    addBroken: schemaOf(NoteEntity).pick({ text: true, authorId: true })
+  }
+})
 
 export const source = () => new DataSource(scheme, { createDriver: createMemoryDriver })
 
@@ -121,14 +143,17 @@ export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
 
 export const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms))
 
-/** Журнал на базовом драйвере: события копятся в `events` и уходят слушателям потока. */
-export const createJournal = () => {
+/** Рантайм на базовом драйвере: события копятся в `events` и уходят слушателям потока. */
+export const createRuntime = () => {
   const events: DomainEvent[] = []
   const partial: PartialWrite[] = []
   const stream = new Set<(event: DomainEvent) => void>()
   const serverSource = source()
 
-  const server = createServerShell(domains, serverSource, {
+  const runtime = new DomainRuntime({
+    domains,
+    params,
+    dataSource: serverSource,
     counterCollection: 'counter',
     resolveActor: (name: string): Actor => {
       if (name === 'чужой') {
@@ -145,5 +170,5 @@ export const createJournal = () => {
     onPartialWrite: (info) => partial.push(info)
   })
 
-  return { server, serverSource, events, partial, stream }
+  return { runtime, serverSource, events, partial, stream }
 }
