@@ -1,12 +1,12 @@
 /**
  * Слой данных клиента на oxeo 1.0: клиент держит живую часть базы сервера — то, что прочитали страницы, — и получает
  * изменения событиями. Схема и домены — только типами: ни декораторов, ни классов доменов в сборке клиента нет.
- * Компоненты, которые читают данные, — в обёртке `observer`; код, который зовут чужие компоненты (`useOptions` formkit),
+ * Компоненты, которые читают данные, — в обёртке `live`; код, который зовут чужие компоненты (`useOptions` formkit),
  * читает через мост `useData`. Запросы идут через `network` kit — их видит панель Networks.
  */
 import { createElement } from 'react'
 import { AppPage, createStore, network } from '../../../app/kit'
-import { DomainEvent, QueryAnswer, createClient, createObserver, createUseData } from '../lib/client'
+import { DomainEvent, QueryAnswer, createClient, createLive, createUseData } from '../lib/client'
 import type { AppDomains } from '../core/domains'
 import type { AppScheme } from '../core/scheme'
 
@@ -72,10 +72,10 @@ export const client = createClient<AppScheme, AppDomains>({
 })
 
 /** Объект данных и вызовы операций: промис вызова разрешается, когда событие применено у клиента. */
-export const { data, DomainsAPI } = client
+export const { db, DomainsAPI } = client
 
 /** Обёртка компонентов, которые читают данные; умолчания — заглушка и вид ошибки страницы kit. */
-export const observer = createObserver(client, {
+export const live = createLive(client, {
   fallback: createElement(AppPage.Loading),
   error: ({ retry }) => createElement(AppPage.Failed, { onRetry: retry })
 })

@@ -1,13 +1,13 @@
 import { useNavigate } from 'react-router'
 import { AppPage, RecordsTable } from '../../../../app/kit'
-import { data, observer } from '../data'
+import { db, live } from '../data'
 import { paths } from './paths'
 
 /** Все справочники; строка ведёт в справочник с его значениями. */
-export const DictionariesPage = observer(() => {
+export const DictionariesPage = live(() => {
   const navigate = useNavigate()
 
-  const dictionaries = data.dictionary.all()
+  const dictionaries = db.dictionary.all()
 
   return (
     <AppPage title="Справочники" aside={dictionaries.length}>

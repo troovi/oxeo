@@ -1,11 +1,11 @@
 /**
- * Поля выбора записей для форм действий: варианты читает поле formkit через `useOptions`, а не компонент в `observer`,
+ * Поля выбора записей для форм действий: варианты читает поле formkit через `useOptions`, а не компонент в `live`,
  * поэтому чтение идёт мостом `useData` — поле подписано на записи и показывает загрузку по `isLoading`. Свежие сверху.
  * Выбор одной записи всегда обязателен — он задаёт, над чем действие.
  */
 import { SelectForm, SelectTagsForm } from '../../../../../app/kit'
 import { AppKey } from '../../../core/keys'
-import { data, useData } from '../../data'
+import { db, useData } from '../../data'
 
 export const EntityShortForms = {
   WorkerSelect: <N extends string>(name: N) => {
@@ -88,7 +88,7 @@ export const EntityShortForms = {
 // options
 
 const useWorkerOptions = () => {
-  const { value: workers, isLoading } = useData(() => data.worker.all())
+  const { value: workers, isLoading } = useData(() => db.worker.all())
   const sorted = [...workers].sort((a, b) => b.createdAt - a.createdAt)
 
   const options = sorted.map((worker) => ({
@@ -101,7 +101,7 @@ const useWorkerOptions = () => {
 }
 
 const useClientOptions = () => {
-  const { value: clients, isLoading } = useData(() => data.client.all())
+  const { value: clients, isLoading } = useData(() => db.client.all())
   const sorted = [...clients].sort((a, b) => b.createdAt - a.createdAt)
 
   const options = sorted.map((client) => ({
@@ -114,7 +114,7 @@ const useClientOptions = () => {
 }
 
 const useProjectOptions = () => {
-  const { value: projects, isLoading } = useData(() => data.project.all())
+  const { value: projects, isLoading } = useData(() => db.project.all())
   const sorted = [...projects].sort((a, b) => b.createdAt - a.createdAt)
 
   const options = sorted.map((project) => ({
@@ -127,7 +127,7 @@ const useProjectOptions = () => {
 }
 
 const useShiftOptions = () => {
-  const { value: shifts, isLoading } = useData(() => data.shift.all())
+  const { value: shifts, isLoading } = useData(() => db.shift.all())
   const sorted = [...shifts].sort((a, b) => b.createdAt - a.createdAt)
 
   const options = sorted.map((shift) => ({
@@ -140,7 +140,7 @@ const useShiftOptions = () => {
 }
 
 const useParticipantOptions = () => {
-  const { value: participants, isLoading } = useData(() => data.participant.all())
+  const { value: participants, isLoading } = useData(() => db.participant.all())
   const sorted = [...participants].sort((a, b) => b.addedAt - a.addedAt)
 
   const options = sorted.map((participant) => ({
@@ -153,7 +153,7 @@ const useParticipantOptions = () => {
 }
 
 const useOptionOptions = () => {
-  const { value: options, isLoading } = useData(() => data.option.all())
+  const { value: options, isLoading } = useData(() => db.option.all())
 
   const items = options.map((option) => ({
     value: option.value,
@@ -166,7 +166,7 @@ const useOptionOptions = () => {
 
 /** Значения одного справочника — запрос по словарю, а не все значения. */
 const useDictionaryOptions = (dictionary: AppKey.Dictionary) => {
-  const { value: options, isLoading } = useData(() => data.option.find({ dictionary }))
+  const { value: options, isLoading } = useData(() => db.option.find({ dictionary }))
   const items = options.map((option) => ({ value: option.value, title: option.title }))
 
   return { options: items, isLoading }

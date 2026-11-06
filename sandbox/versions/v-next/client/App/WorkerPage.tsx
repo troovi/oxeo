@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from 'react-router'
 import { AppPage, RecordFields, RecordsTable } from '../../../../app/kit'
 import type { DictionaryEntities } from '../../core/scheme'
-import { data, observer } from '../data'
+import { db, live } from '../data'
 import { paths } from './paths'
 
 /**
@@ -9,15 +9,15 @@ import { paths } from './paths'
  * Сотрудник, клиенты и участия собираются одним пакетом; значения справочников и смены участий приходят в нём же —
  * захватом по ссылкам.
  */
-export const WorkerPage = observer(() => {
+export const WorkerPage = live(() => {
   const params = useParams()
   const navigate = useNavigate()
 
   const workerId = Number(params.workerId)
 
-  const worker = data.worker.get(workerId)
-  const clients = data.client.find({ managerId: workerId })
-  const participants = data.participant.find({ workerId })
+  const worker = db.worker.get(workerId)
+  const clients = db.client.find({ managerId: workerId })
+  const participants = db.participant.find({ workerId })
 
   if (!worker) {
     return <AppPage.Empty>Сотрудника {params.workerId} нет</AppPage.Empty>
@@ -25,7 +25,7 @@ export const WorkerPage = observer(() => {
 
   const linked = [...worker.regionIds, worker.citizenshipId]
   const optionIds = linked.filter((value): value is string => value !== null)
-  const found = optionIds.map((value) => data.option.get(value))
+  const found = optionIds.map((value) => db.option.get(value))
   const options = found.filter((option): option is DictionaryEntities.Option => option !== null)
 
   return (

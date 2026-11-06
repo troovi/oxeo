@@ -1,13 +1,13 @@
 import { useNavigate } from 'react-router'
 import { AppPage, RecordsTable } from '../../../../app/kit'
-import { data, observer } from '../data'
+import { db, live } from '../data'
 import { paths } from './paths'
 
 /** Все проекты, свежие сверху; строка ведёт в запись. */
-export const ProjectsPage = observer(() => {
+export const ProjectsPage = live(() => {
   const navigate = useNavigate()
 
-  const projects = data.project.all()
+  const projects = db.project.all()
 
   return (
     <AppPage title="Проекты" aside={projects.length}>

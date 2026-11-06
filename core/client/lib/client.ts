@@ -1,5 +1,5 @@
 /**
- * Клиент — то, чем пользуется приложение: объект данных `data` и вызовы операций `DomainsAPI` над живой частью базы
+ * Клиент — то, чем пользуется приложение: объект данных `db` и вызовы операций `DomainsAPI` над живой частью базы
  * `LiveStore`. Домены клиент не исполняет, схема и домены нужны ему только типами: в рантайме от `@oxeo/scheme` он берёт
  * лишь вход `filter`, а имена коллекций и операций получает прокси в момент обращения. Привязка к React — `@oxeo/react`.
  */
@@ -36,8 +36,8 @@ export interface CollectionReader<T, I extends IType> {
   load(where?: Where<T>): Promise<T[]>
 }
 
-/** Объект данных: `data.<collection>`, типы — из схемы. */
-export type DataApi<Scheme extends CollectionScheme> = {
+/** Объект данных: `db.<collection>`, типы — из схемы. */
+export type DbApi<Scheme extends CollectionScheme> = {
   [K in keyof Scheme]: CollectionReader<ExtractType<Scheme[K]['model']>, Scheme[K]['identifierType']>
 }
 
@@ -63,7 +63,7 @@ export const createClient = <Scheme extends CollectionScheme, Domains extends Do
   const store = new LiveStore(options)
   const readers = new Map<string, CollectionReader<object, IType>>()
 
-  const data = new Proxy({} as DataApi<Scheme>, {
+  const db = new Proxy({} as DbApi<Scheme>, {
     get: (_, collection) => {
       if (!isMethodKey(collection)) {
         return undefined
@@ -112,7 +112,7 @@ export const createClient = <Scheme extends CollectionScheme, Domains extends Do
   })
 
   return {
-    data,
+    db,
     DomainsAPI,
     /** Событие из потока. */
     push: (event: DomainEvent) => {

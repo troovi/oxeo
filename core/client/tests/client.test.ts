@@ -45,15 +45,15 @@ describe('createClient', () => {
       null
     )
 
-    expect(() => client.data.note.all()).toThrow(UncoveredReadError)
+    expect(() => client.db.note.all()).toThrow(UncoveredReadError)
 
-    const notes = await client.data.note.load()
+    const notes = await client.db.note.load()
 
     expect(notes.map((note) => note.text)).toEqual(['a'])
-    expect(client.data.note.all()).toHaveLength(1)
+    expect(client.db.note.all()).toHaveLength(1)
     // автор пришёл захватом по ссылке — покрыт без запроса
-    expect(client.data.author.get(1)?.name).toBe('Аня')
-    expect(() => client.data.author.get(2)).toThrow(UncoveredReadError)
+    expect(client.db.author.get(1)?.name).toBe('Аня')
+    expect(() => client.db.author.get(2)).toThrow(UncoveredReadError)
   })
 
   it('проход собирает потребности в один пакет, второй проход видит данные', async () => {
@@ -68,9 +68,9 @@ describe('createClient', () => {
     )
 
     const body = () => {
-      const author = client.data.author.get(1)
-      const notes = client.data.note.find({ authorId: 1 })
-      const drafts = client.data.note.count({ status: 'draft' })
+      const author = client.db.author.get(1)
+      const notes = client.db.note.find({ authorId: 1 })
+      const drafts = client.db.note.count({ status: 'draft' })
 
       return { name: author?.name ?? null, texts: notes.map((note) => note.text), drafts }
     }
@@ -99,7 +99,7 @@ describe('createClient', () => {
       null
     )
 
-    await client.data.note.load({ status: 'draft' })
+    await client.db.note.load({ status: 'draft' })
 
     // смена 2 создаётся черновиком — входит; смена 1 опубликована — выходит
     await fixture.runtime.run(
@@ -109,13 +109,13 @@ describe('createClient', () => {
     await fixture.runtime.run({ domain: 'notes', method: 'publish', params: { noteId: 1 } }, null)
     await tick()
 
-    expect(client.data.note.find({ status: 'draft' }).map((note) => note.noteId)).toEqual([2])
+    expect(client.db.note.find({ status: 'draft' }).map((note) => note.noteId)).toEqual([2])
 
     await fixture.runtime.run({ domain: 'notes', method: 'remove', params: { noteId: 2 } }, null)
     await tick()
 
-    expect(client.data.note.find({ status: 'draft' })).toEqual([])
-    expect(client.data.note.get(2)).toBeNull()
+    expect(client.db.note.find({ status: 'draft' })).toEqual([])
+    expect(client.db.note.get(2)).toBeNull()
     expect(changes.some((change) => change.records.get('note:1')?.includes('status'))).toBe(true)
   })
 
@@ -126,12 +126,12 @@ describe('createClient', () => {
     const authorId = await client.DomainsAPI.notes.addAuthor({ name: 'Аня' })
 
     expect(authorId).toBe(1)
-    expect(client.data.author.get(1)?.name).toBe('Аня')
+    expect(client.db.author.get(1)?.name).toBe('Аня')
     // чужой вызов: запись никто не ждёт — клиент её не держит
     await fixture.runtime.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Боря' } }, null)
     await tick()
 
-    expect(() => client.data.author.get(2)).toThrow(UncoveredReadError)
+    expect(() => client.db.author.get(2)).toThrow(UncoveredReadError)
   })
 
   it('счётчик перезапрашивается после изменений коллекции', async () => {
@@ -141,12 +141,12 @@ describe('createClient', () => {
     await fixture.runtime.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Аня' } }, null)
     await client.request([{ kind: 'count', collection: 'author', where: null }])
 
-    expect(client.data.author.count()).toBe(1)
+    expect(client.db.author.count()).toBe(1)
 
     await fixture.runtime.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Боря' } }, null)
     await tick(20)
 
-    expect(client.data.author.count()).toBe(2)
+    expect(client.db.author.count()).toBe(2)
   })
 
   it('пересинхронизация забывает всё и будит всех подписчиков', async () => {
@@ -156,9 +156,9 @@ describe('createClient', () => {
     const tracker = new Tracker()
 
     await fixture.runtime.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Аня' } }, null)
-    await client.data.author.load()
+    await client.db.author.load()
 
-    pass(tracker, () => client.data.author.all())
+    pass(tracker, () => client.db.author.all())
 
     const affected: boolean[] = []
 
@@ -167,7 +167,7 @@ describe('createClient', () => {
 
     expect(reasons).toEqual(['сервер: reset'])
     expect(affected).toEqual([true])
-    expect(() => client.data.author.all()).toThrow(UncoveredReadError)
+    expect(() => client.db.author.all()).toThrow(UncoveredReadError)
   })
 
   it('then и символы не становятся вызовами и коллекциями', async () => {
@@ -175,7 +175,7 @@ describe('createClient', () => {
     const { client } = connectClient(fixture)
 
     await expect(Promise.resolve(client.DomainsAPI)).resolves.toBe(client.DomainsAPI)
-    await expect(Promise.resolve(client.data)).resolves.toBe(client.data)
+    await expect(Promise.resolve(client.db)).resolves.toBe(client.db)
     expect(
       (client.DomainsAPI.notes as Record<PropertyKey, unknown>)[Symbol.toStringTag]
     ).toBeUndefined()
@@ -266,18 +266,18 @@ describe('пересинхронизация и пакеты в полёте', (
     answers[0]({ records: [note(1, 'старая')], results: [{ ids: [1] }] })
     await first
 
-    expect(() => client.data.note.all()).toThrow(UncoveredReadError)
+    expect(() => client.db.note.all()).toThrow(UncoveredReadError)
 
     answers[1]({ records: [note(1, 'новая')], results: [{ ids: [1] }] })
     await second
 
-    expect(client.data.note.get(1)?.text).toBe('новая')
+    expect(client.db.note.get(1)?.text).toBe('новая')
   })
 
   it('отказ старого пакета не становится отказом нового состояния', async () => {
     const { client, refusals } = connect()
     const tracker = new Tracker()
-    const body = () => client.data.note.all()
+    const body = () => client.db.note.all()
 
     pass(tracker, body)
 
@@ -297,7 +297,7 @@ describe('пересинхронизация и пакеты в полёте', (
   it('успех старого пакета не снимает отказ нового состояния', async () => {
     const { client, answers, refusals } = connect()
     const tracker = new Tracker()
-    const body = () => client.data.note.all()
+    const body = () => client.db.note.all()
 
     pass(tracker, body)
 
@@ -323,7 +323,7 @@ describe('пересинхронизация и пакеты в полёте', (
 
   it('load через пересинхронизацию запрашивает снова', async () => {
     const { client, answers } = connect()
-    const loading = client.data.note.load()
+    const loading = client.db.note.load()
 
     await tick()
     client.resync('тест')
@@ -353,7 +353,7 @@ describe('пересинхронизация и пакеты в полёте', (
     answers[1]({ records: [], results: [{ count: 2 }] })
     await tick()
 
-    expect(() => client.data.note.count()).toThrow(UncoveredReadError)
+    expect(() => client.db.note.count()).toThrow(UncoveredReadError)
   })
 
   it('сборщик замечает изменения после прохода: подписка появляется позже него', () => {
@@ -388,7 +388,7 @@ describe('поток и ответ вызова', () => {
       onResync
     })
 
-    await client.data.note.load()
+    await client.db.note.load()
 
     return { client, pending }
   }
@@ -403,7 +403,7 @@ describe('поток и ответ вызова', () => {
 
     await called
 
-    expect(client.data.note.get(1)?.text).toBe('новее')
+    expect(client.db.note.get(1)?.text).toBe('новее')
   })
 
   it('ответ вызова обогнал поток: своя версия — сразу, чужое событие не теряется', async () => {
@@ -417,13 +417,13 @@ describe('поток и ответ вызова', () => {
 
     await called
 
-    expect(client.data.note.get(1)?.text).toBe('своя')
+    expect(client.db.note.get(1)?.text).toBe('своя')
 
     client.push(event(2, [note(1, 'чужая'), note(2, 'чужая')]))
     client.push(event(3, [note(1, 'своя')]))
 
-    expect(client.data.note.get(1)?.text).toBe('своя')
-    expect(client.data.note.get(2)?.text).toBe('чужая')
+    expect(client.db.note.get(1)?.text).toBe('своя')
+    expect(client.db.note.get(2)?.text).toBe('чужая')
   })
 
   it('разрыв ревизий и смена эпохи ведут к пересинхронизации', async () => {

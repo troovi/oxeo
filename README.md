@@ -202,29 +202,29 @@ export const runtime = new DomainRuntime({
 ```ts
 // client/data.ts
 import { createClient } from '@oxeo/client'
-import { createObserver, createUseData } from '@oxeo/react'
+import { createLive, createUseData } from '@oxeo/react'
 import type { AppDomains } from '../core/domains'
 import type { AppScheme } from '../core/scheme'
 
 export const client = createClient<AppScheme, AppDomains>({ transport })
 
-export const { data, DomainsAPI } = client
-export const observer = createObserver(client, { fallback: <Spinner />, error: (props) => <LoadError {...props} /> })
+export const { db, DomainsAPI } = client
+export const live = createLive(client, { fallback: <Spinner />, error: (props) => <LoadError {...props} /> })
 export const useData = createUseData(client)
 ```
 
-Компонент в обёртке `observer` читает данные прямыми вызовами. Недостающее уходит одним пакетом запросов, а пока ответа
-нет, обёртка рисует заглушку. Код компонента о загрузке не знает.
+Компонент в обёртке `live` читает данные прямыми вызовами. Недостающее уходит одним пакетом запросов, а пока ответа нет,
+обёртка рисует заглушку. Код компонента о загрузке не знает.
 
 ```tsx
-export const NotePage = observer(({ noteId }: { noteId: number }) => {
-  const note = data.note.get(noteId)
+export const NotePage = live(({ noteId }: { noteId: number }) => {
+  const note = db.note.get(noteId)
 
   if (!note) {
     return <NotFound />
   }
 
-  return <NoteView note={note} author={data.author.get(note.authorId)} />
+  return <NoteView note={note} author={db.author.get(note.authorId)} />
 })
 
 // операция: исполняет сервер, после await клиент уже держит новые версии записей
@@ -238,15 +238,15 @@ await DomainsAPI.notes.add({ text, authorId })
 такое чтение не находит.
 
 ```tsx
-const AuthorName = observer(
+const AuthorName = live(
   ({ authorId }: { authorId: number }) => {
-    return <span>{data.author.get(authorId)?.name}</span>
+    return <span>{db.author.get(authorId)?.name}</span>
   },
   { fallback: <span>…</span> }
 )
 
-export const NotesPage = observer(() => {
-  return data.note.all().map((note) => (
+export const NotesPage = live(() => {
+  return db.note.all().map((note) => (
     <p key={note.noteId}>
       {note.text} — <AuthorName authorId={note.authorId} />
     </p>
@@ -270,7 +270,7 @@ export const NotesPage = observer(() => {
 | `core/scheme`    | `@oxeo/scheme`        | декораторы, `DataScheme`, `schemaOf`, контракт доменов и коллекций, фильтр, протокол | `core`; клиент — только типы |
 | `core/server`    | `@oxeo/server`        | `DataSource`, `DataProcessor`, `DomainRuntime`, договор драйвера                     | сервер                       |
 | `core/client`    | `@oxeo/client`        | живая часть базы, чтения, пакеты запросов, события, вызовы операций                  | клиент                       |
-| `core/react`     | `@oxeo/react`         | `createObserver`, `createUseData`                                                    | клиент на React              |
+| `core/react`     | `@oxeo/react`         | `createLive`, `createUseData`                                                        | клиент на React              |
 | `core/types`     | `@oxeo/types`         | типы HTTP-маршрутов и файлов                                                         | приложения                   |
 | `drivers/mongo`  | `@oxeo-drivers/mongo`  | драйвер MongoDB, модуль NestJS                                                       | сервер                       |
 | `drivers/memory` | `@oxeo-drivers/memory` | драйвер в памяти процесса                                                            | тесты доменов, песочницы     |
@@ -315,6 +315,6 @@ npm run test:mongo # кейсы целостности на MongoDB (127.0.0.1:2
 Порядок сборки важен: `@oxeo/scheme`, затем `@oxeo/server`, драйверы, `@oxeo/client`, `@oxeo/react` и `@oxeo/devkit`.
 Пакеты подключают друг друга собранными, а `@oxeo/client` вшивает в себя вход `filter` из `dist` пакета `@oxeo/scheme`.
 
-Публикация — `.github/workflows/publish.yml`, пока выключена: push workflow не запускает. Когда она включена, push в
-`master` публикует пакет, у которого изменился `package.json`; нужен секрет `NPM_TOKEN`. Номер версии поднимается
-вручную.
+Публикация — `.github/workflows/publish.yml`: push в `master` публикует пакет, у которого в этом пуше изменился
+`package.json`; нужен секрет `NPM_TOKEN`. Номер версии поднимается вручную: без новой версии публикация такого пакета
+упадёт, потому что эта версия уже есть в npm.

@@ -1,17 +1,17 @@
 import { useNavigate, useParams } from 'react-router'
 import { AppPage, RecordFields, RecordsTable } from '../../../../app/kit'
-import { data, observer } from '../data'
+import { db, live } from '../data'
 import { paths } from './paths'
 
 /** Запись смены: поля (проект — ссылкой) и участники; строка участника ведёт в сотрудника. */
-export const ShiftPage = observer(() => {
+export const ShiftPage = live(() => {
   const params = useParams()
   const navigate = useNavigate()
 
   const shiftId = Number(params.shiftId)
 
-  const shift = data.shift.get(shiftId)
-  const participants = data.participant.find({ shiftId })
+  const shift = db.shift.get(shiftId)
+  const participants = db.participant.find({ shiftId })
 
   if (!shift) {
     return <AppPage.Empty>Смены {params.shiftId} нет</AppPage.Empty>

@@ -1,11 +1,11 @@
 /**
- * Обёртка `observer` — привязка клиента oxeo к React. Внутри у неё свои границы ошибок и Suspense, поэтому приложению их
+ * Обёртка `live` — привязка клиента oxeo к React. Внутри у неё свои границы ошибок и Suspense, поэтому приложению их
  * расставлять не нужно: заглушка загрузки и вид ошибки — опции обёртки с умолчаниями, заданными один раз.
  */
 import { Component, Suspense } from 'react'
 import { BindingClient, useTracker } from './use-tracker'
 
-export interface ObserverViews {
+export interface LiveViews {
   /** Пока догружается то, что тело прочитало. */
   fallback: React.ReactNode
   /** Пакет не удался после повторов; `retry` отправляет непрошедшие запросы заново. */
@@ -20,19 +20,16 @@ export interface ObserverViews {
  * компонент со своей обёрткой: заглушка встанет только на его месте.
  *
  * ```tsx
- * export const observer = createObserver(client, { fallback: <Spinner />, error: (props) => <LoadError {...props} /> })
- * export const WorkerPage = observer(() => { … }, { fallback: <AppPage.Loading /> })
+ * export const live = createLive(client, { fallback: <Spinner />, error: (props) => <LoadError {...props} /> })
+ * export const WorkerPage = live(() => { … }, { fallback: <AppPage.Loading /> })
  * ```
  */
-export const createObserver = (client: BindingClient, defaults: ObserverViews) => {
-  return <P extends object>(
-    body: (props: P) => React.ReactNode,
-    views: Partial<ObserverViews> = {}
-  ) => {
+export const createLive = (client: BindingClient, defaults: LiveViews) => {
+  return <P extends object>(body: (props: P) => React.ReactNode, views: Partial<LiveViews> = {}) => {
     const fallback = 'fallback' in views ? views.fallback : defaults.fallback
     const error = views.error ?? defaults.error
 
-    const Observed = (props: P) => {
+    const Live = (props: P) => {
       return (
         <LoadErrorBoundary client={client} render={error}>
           <Suspense fallback={fallback}>
@@ -42,7 +39,7 @@ export const createObserver = (client: BindingClient, defaults: ObserverViews) =
       )
     }
 
-    return Observed
+    return Live
   }
 }
 
@@ -101,7 +98,7 @@ class LoadError extends Error {
 
 interface LoadErrorBoundaryProps {
   client: BindingClient
-  render: ObserverViews['error']
+  render: LiveViews['error']
   children: React.ReactNode
 }
 

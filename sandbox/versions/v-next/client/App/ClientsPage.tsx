@@ -1,13 +1,13 @@
 import { useNavigate } from 'react-router'
 import { AppPage, RecordsTable } from '../../../../app/kit'
-import { data, observer } from '../data'
+import { db, live } from '../data'
 import { paths } from './paths'
 
 /** Все клиенты, свежие сверху; строка ведёт в запись. */
-export const ClientsPage = observer(() => {
+export const ClientsPage = live(() => {
   const navigate = useNavigate()
 
-  const clients = data.client.all()
+  const clients = db.client.all()
 
   return (
     <AppPage title="Клиенты" aside={clients.length}>

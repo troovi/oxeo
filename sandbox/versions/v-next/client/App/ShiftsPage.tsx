@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router'
 import { AppPage, RecordsTable } from '../../../../app/kit'
 import { AppKey, AppKeys } from '../../core/keys'
-import { data, observer } from '../data'
+import { db, live } from '../data'
 import { paths } from './paths'
 
 /** Подписи сегментов стадий. */
@@ -17,10 +17,10 @@ const STAGE_TITLES: Record<AppKey.ShiftStage, string> = {
  * живой запрос по полю, которое у записи меняется: событие несёт смену целиком, и клиент сам решает, вошла она в
  * сегмент или вышла, — даже если до операции смены у него не было.
  */
-export const ShiftsPage = observer(({ stage }: { stage?: AppKey.ShiftStage }) => {
+export const ShiftsPage = live(({ stage }: { stage?: AppKey.ShiftStage }) => {
   const navigate = useNavigate()
 
-  const shifts = stage ? data.shift.find({ stage }) : data.shift.all()
+  const shifts = stage ? db.shift.find({ stage }) : db.shift.all()
 
   return (
     <AppPage title="Смены" aside={shifts.length}>

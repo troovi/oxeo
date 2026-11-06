@@ -1,17 +1,17 @@
 import { useNavigate, useParams } from 'react-router'
 import { AppPage, RecordFields, RecordsTable } from '../../../../app/kit'
-import { data, observer } from '../data'
+import { db, live } from '../data'
 import { paths } from './paths'
 
 /** Запись проекта: поля (клиент — ссылкой) и смены проекта. */
-export const ProjectPage = observer(() => {
+export const ProjectPage = live(() => {
   const params = useParams()
   const navigate = useNavigate()
 
   const projectId = Number(params.projectId)
 
-  const project = data.project.get(projectId)
-  const shifts = data.shift.find({ projectId })
+  const project = db.project.get(projectId)
+  const shifts = db.shift.find({ projectId })
 
   if (!project) {
     return <AppPage.Empty>Проекта {params.projectId} нет</AppPage.Empty>

@@ -1,6 +1,6 @@
 /**
  * Мост для кода, который вызывают чужие компоненты: `useOptions` поля formkit, колбэки списков uikit. Хозяин такого кода
- * не в обёртке `observer`, поэтому чтение идёт через хук.
+ * не в обёртке `live`, поэтому чтение идёт через хук.
  */
 import { useEffect, useState } from 'react'
 import { BindingClient, useTracker } from './use-tracker'
@@ -14,7 +14,7 @@ import { BindingClient, useTracker } from './use-tracker'
  * ```ts
  * export const useData = createUseData(client)
  *
- * const { value: workers, isLoading } = useData(() => data.worker.all())
+ * const { value: workers, isLoading } = useData(() => db.worker.all())
  * ```
  */
 export const createUseData = (client: BindingClient) => {

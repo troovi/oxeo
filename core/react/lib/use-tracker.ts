@@ -1,6 +1,6 @@
 /**
- * Сборщик компонента и подписка React на него — общее для обёртки `observer` и моста `useData`. Сборщик и клиент о
- * React не знают: число для `useSyncExternalStore` живёт здесь.
+ * Сборщик компонента и подписка React на него — общее для обёртки `live` и моста `useData`. Сборщик и клиент о React
+ * не знают: число для `useSyncExternalStore` живёт здесь.
  */
 import { useState, useSyncExternalStore } from 'react'
 import { Tracker } from '@oxeo/client'

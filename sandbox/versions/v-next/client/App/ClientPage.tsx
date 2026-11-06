@@ -1,17 +1,17 @@
 import { useNavigate, useParams } from 'react-router'
 import { AppPage, RecordFields, RecordsTable } from '../../../../app/kit'
-import { data, observer } from '../data'
+import { db, live } from '../data'
 import { paths } from './paths'
 
 /** Запись клиента: поля (менеджер — ссылкой) и проекты клиента. */
-export const ClientPage = observer(() => {
+export const ClientPage = live(() => {
   const params = useParams()
   const navigate = useNavigate()
 
   const clientId = Number(params.clientId)
 
-  const client = data.client.get(clientId)
-  const projects = data.project.find({ clientId })
+  const client = db.client.get(clientId)
+  const projects = db.project.find({ clientId })
 
   if (!client) {
     return <AppPage.Empty>Клиента {params.clientId} нет</AppPage.Empty>
