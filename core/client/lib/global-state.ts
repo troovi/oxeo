@@ -7,6 +7,8 @@ import type { Tracker } from './tracker'
 class OxeoGlobals {
   /** Сборщик прохода, который идёт сейчас; `null` — чтение вне рендера. */
   currentTracker: Tracker | null = null
+  /** Сколько раз менялись данные клиента: сборщик сверяет его, когда подписка появляется позже прохода. */
+  changes = 0
 }
 
 export const globalState = new OxeoGlobals()

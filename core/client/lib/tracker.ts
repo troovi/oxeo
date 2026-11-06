@@ -44,6 +44,8 @@ export class Tracker {
   readonly collections = new Set<string>()
 
   private proxies = new WeakMap<object, object>()
+  /** Сколько изменений клиента было к началу прохода. */
+  private seenChanges = 0
 
   /** Проход: всё прочитанное прошлым проходом забывается, сборщик становится текущим на время `body`. */
   run<R>(body: () => R) {
@@ -55,6 +57,7 @@ export class Tracker {
     this.queries.clear()
     this.collections.clear()
     this.proxies = new WeakMap()
+    this.seenChanges = globalState.changes
 
     globalState.currentTracker = this
 
@@ -63,6 +66,11 @@ export class Tracker {
     } finally {
       globalState.currentTracker = prev
     }
+  }
+
+  /** Менялись ли данные клиента после прохода: подписка появляется позже него и этих изменений не видела. */
+  hasMissedChanges() {
+    return globalState.changes !== this.seenChanges
   }
 
   /** Набор прочитанных полей записи; заводится пустым — «важна сама запись». */

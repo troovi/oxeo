@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { DomainEvent, RecordVersion } from '@oxeo/scheme'
+import type { DomainEvent, Query, QueryAnswer, RecordVersion } from '@oxeo/scheme'
 import { clone, createRuntime, domains, tick, type Scheme } from '../../server/tests/runtime.fixture'
 import { ClientChange, Tracker, UncoveredReadError, createClient } from '../lib'
 
@@ -208,24 +208,170 @@ describe('Tracker', () => {
   })
 })
 
+const note = (noteId: number, text: string): RecordVersion => ({
+  collection: 'note',
+  id: noteId,
+  record: { noteId, text, status: 'draft', createdAt: 0, authorId: 1 }
+})
+
+const event = (revision: number, changes: RecordVersion[], epoch = 'e1'): DomainEvent => ({
+  epoch,
+  revision,
+  domain: 'notes',
+  method: 'publish',
+  params: {},
+  ctx: { actor: null, at: 0, today: '2026-01-01' },
+  result: null,
+  changes
+})
+
+describe('пересинхронизация и пакеты в полёте', () => {
+  const notes: Query = { kind: 'find', collection: 'note', where: null }
+
+  /** Клиент над транспортом, ответы которого отдаёт тест: пакет — `answers[i]`, отказ — `refusals[i]`. */
+  const connect = () => {
+    const answers: ((answer: QueryAnswer) => void)[] = []
+    const refusals: ((error: Error) => void)[] = []
+    const client = createClient<Scheme, typeof domains>({
+      transport: {
+        query: () => {
+          return new Promise((resolve, reject) => {
+            answers.push(resolve)
+            refusals.push(reject)
+          })
+        },
+        call: async () => {
+          throw new Error('вызовов в этих тестах нет')
+        }
+      },
+      retries: [],
+      countDelay: 0
+    })
+
+    return { client, answers, refusals }
+  }
+
+  it('ответ старого пакета не кладётся, а новое чтение уходит новым пакетом', async () => {
+    const { client, answers } = connect()
+    const first = client.request([notes])
+
+    await tick()
+    client.resync('тест')
+
+    const second = client.request([notes])
+
+    await tick()
+    expect(answers).toHaveLength(2)
+
+    answers[0]({ records: [note(1, 'старая')], results: [{ ids: [1] }] })
+    await first
+
+    expect(() => client.data.note.all()).toThrow(UncoveredReadError)
+
+    answers[1]({ records: [note(1, 'новая')], results: [{ ids: [1] }] })
+    await second
+
+    expect(client.data.note.get(1)?.text).toBe('новая')
+  })
+
+  it('отказ старого пакета не становится отказом нового состояния', async () => {
+    const { client, refusals } = connect()
+    const tracker = new Tracker()
+    const body = () => client.data.note.all()
+
+    pass(tracker, body)
+
+    const request = client.request([...tracker.needs.values()])
+
+    await tick()
+    client.resync('тест')
+    refusals[0](new Error('упал'))
+    await request
+
+    pass(tracker, body)
+
+    expect(tracker.failures.size).toBe(0)
+    expect(tracker.needs.size).toBe(1)
+  })
+
+  it('успех старого пакета не снимает отказ нового состояния', async () => {
+    const { client, answers, refusals } = connect()
+    const tracker = new Tracker()
+    const body = () => client.data.note.all()
+
+    pass(tracker, body)
+
+    const needs = [...tracker.needs.values()]
+    const first = client.request(needs)
+
+    await tick()
+    client.resync('тест')
+
+    const second = client.request(needs)
+
+    await tick()
+    refusals[1](new Error('упал'))
+    await expect(second).rejects.toThrow('упал')
+
+    answers[0]({ records: [], results: [{ ids: [] }] })
+    await first
+
+    pass(tracker, body)
+
+    expect(tracker.failures.size).toBe(1)
+  })
+
+  it('load через пересинхронизацию запрашивает снова', async () => {
+    const { client, answers } = connect()
+    const loading = client.data.note.load()
+
+    await tick()
+    client.resync('тест')
+    answers[0]({ records: [note(1, 'старая')], results: [{ ids: [1] }] })
+    await tick(5)
+
+    expect(answers).toHaveLength(2)
+
+    answers[1]({ records: [note(1, 'новая')], results: [{ ids: [1] }] })
+
+    const loaded = await loading
+
+    expect(loaded.map((item) => item.text)).toEqual(['новая'])
+  })
+
+  it('число старого перезапроса счётчика не кладётся', async () => {
+    const { client, answers } = connect()
+    const loaded = client.request([{ kind: 'count', collection: 'note', where: null }])
+
+    await tick()
+    answers[0]({ records: [], results: [{ count: 1 }] })
+    await loaded
+
+    client.push(event(1, [note(1, 'a')]))
+    await tick(5)
+    client.resync('тест')
+    answers[1]({ records: [], results: [{ count: 2 }] })
+    await tick()
+
+    expect(() => client.data.note.count()).toThrow(UncoveredReadError)
+  })
+
+  it('сборщик замечает изменения после прохода: подписка появляется позже него', () => {
+    const { client } = connect()
+    const tracker = new Tracker()
+
+    pass(tracker, () => null)
+    expect(tracker.hasMissedChanges()).toBe(false)
+
+    client.push(event(1, []))
+    expect(tracker.hasMissedChanges()).toBe(true)
+
+    pass(tracker, () => null)
+    expect(tracker.hasMissedChanges()).toBe(false)
+  })
+})
+
 describe('поток и ответ вызова', () => {
-  const note = (noteId: number, text: string): RecordVersion => ({
-    collection: 'note',
-    id: noteId,
-    record: { noteId, text, status: 'draft', createdAt: 0, authorId: 1 }
-  })
-
-  const event = (revision: number, changes: RecordVersion[], epoch = 'e1'): DomainEvent => ({
-    epoch,
-    revision,
-    domain: 'notes',
-    method: 'publish',
-    params: {},
-    ctx: { actor: null, at: 0, today: '2026-01-01' },
-    result: null,
-    changes
-  })
-
   /** Клиент над управляемым транспортом: заметки 1 и 2 загружены, ответ вызова отдаёт `pending.answer`. */
   const connect = async (onResync?: (reason: string) => void) => {
     const pending = { answer: (_: DomainEvent) => {} }

@@ -15,6 +15,10 @@ export interface ObserverViews {
 /**
  * Обёртка с умолчаниями `fallback` и `error`; каждая обёртка может переопределить их своими.
  *
+ * Заглушка закрывает всё тело обёртки при любом проходе, которому не хватило данных, а не только при первом показе.
+ * Чтение, из-за которого страница не должна пропадать, например запись по ссылке в строке списка, выносится в свой
+ * компонент со своей обёрткой: заглушка встанет только на его месте.
+ *
  * ```tsx
  * export const observer = createObserver(client, { fallback: <Spinner />, error: (props) => <LoadError {...props} /> })
  * export const WorkerPage = observer(() => { … }, { fallback: <AppPage.Loading /> })

@@ -19,18 +19,31 @@ export const useTracker = (client: BindingClient) => {
   return tracker
 }
 
-/** Подписка для `useSyncExternalStore`: снимок растёт только на изменения прочитанного проходом. */
+/**
+ * Подписка для `useSyncExternalStore`: снимок растёт только на изменения прочитанного проходом. React подписывается уже
+ * после прохода, поэтому изменения между ними сверяются отдельно и перерисовывают компонент один раз.
+ */
 const subscriptionOf = (client: BindingClient, tracker: Tracker) => {
   const snapshot = { version: 0 }
 
   return {
     subscribe: (onChange: () => void) => {
-      return client.subscribe((change) => {
+      const refresh = () => {
+        snapshot.version += 1
+        onChange()
+      }
+
+      const unsubscribe = client.subscribe((change) => {
         if (tracker.isAffected(change)) {
-          snapshot.version += 1
-          onChange()
+          refresh()
         }
       })
+
+      if (tracker.hasMissedChanges()) {
+        refresh()
+      }
+
+      return unsubscribe
     },
     getSnapshot: () => {
       return snapshot.version

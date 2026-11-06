@@ -95,6 +95,8 @@ export class LiveStore {
   private nextBatch: NextBatch | null = null
   /** Запросы в пути, отправленные и ещё нет: повторная потребность ждёт их, а не шлёт снова. */
   private inflight = new Map<string, Promise<void>>()
+  /** Номер состояния: растёт с каждой пересинхронизацией, ответ на пакет прежнего состояния не кладётся. */
+  private generation = 0
   private countTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
   // stream
@@ -216,9 +218,9 @@ export class LiveStore {
     return entries.map(([id, record]) => track(id, record))
   }
 
-  /** Явная загрузка для обработчика: непокрытое — с сервера, покрытое — сразу. */
+  /** Явная загрузка для обработчика: непокрытое — с сервера, покрытое — сразу; пересинхронизация в пути — снова. */
   async load(query: Queries.Find) {
-    if (!this.isCovered(query)) {
+    while (!this.isCovered(query)) {
       await this.request([query])
     }
 
@@ -271,23 +273,45 @@ export class LiveStore {
     keys.forEach((key) => this.failures.delete(key))
   }
 
-  /** Отправка накопленного одним пакетом; `get` одной коллекции склеиваются в один список id. */
+  /**
+   * Отправка накопленного одним пакетом; `get` одной коллекции склеиваются в один список id. Итог пакета пишется в наборы
+   * того состояния, в котором он ушёл: у нового состояния они свои.
+   */
   private async flush(queries: Map<string, Query>) {
     const keys = [...queries.keys()]
     const batch: QueryBatch = { queries: mergeGets([...queries.values()]) }
+    const { inflight, failures } = this
 
     this.nextBatch = null
 
     try {
-      const answer = await withRetries(() => this.transport.query(batch), this.retries)
-
-      this.applyAnswer(batch, answer)
-      keys.forEach((key) => this.failures.delete(key))
+      await this.send(batch)
+      keys.forEach((key) => failures.delete(key))
     } catch (error) {
-      keys.forEach((key) => this.failures.add(key))
+      keys.forEach((key) => failures.add(key))
       throw error
     } finally {
-      keys.forEach((key) => this.inflight.delete(key))
+      keys.forEach((key) => inflight.delete(key))
+    }
+  }
+
+  /**
+   * Пакет на сервер с повторами и ответ в хранилище. Пока пакет шёл, клиент мог забыть всё: такой ответ снят с прежнего
+   * состояния и не кладётся, а его отказ уже никому не нужен.
+   */
+  private async send(batch: QueryBatch) {
+    const { generation } = this
+
+    try {
+      const answer = await withRetries(() => this.transport.query(batch), this.retries)
+
+      if (generation === this.generation) {
+        this.applyAnswer(batch, answer)
+      }
+    } catch (error) {
+      if (generation === this.generation) {
+        throw error
+      }
     }
   }
 
@@ -441,12 +465,8 @@ export class LiveStore {
       return
     }
 
-    const batch = { queries }
-
     try {
-      const answer = await withRetries(() => this.transport.query(batch), this.retries)
-
-      this.applyAnswer(batch, answer)
+      await this.send({ queries })
     } catch {
       // прежнее число остаётся до следующего изменения коллекции
     }
@@ -456,14 +476,18 @@ export class LiveStore {
 
   /**
    * Забыть всё и начать заново, без перезагрузки страницы: хранилище и запросы пусты, поток начинается с первого
-   * события. Все подписчики получают изменение «всё»: смонтированные перерисовываются и перезапрашивают то, что читают.
+   * события, пакеты в полёте больше не считаются. Все подписчики получают изменение «всё»: смонтированные
+   * перерисовываются и перезапрашивают то, что читают.
    */
   resync(reason: string) {
     this.records.clear()
     this.complete.clear()
     this.finds.clear()
     this.counts.clear()
-    this.failures.clear()
+
+    this.failures = new Set()
+    this.inflight = new Map()
+    this.generation += 1
 
     this.countTimers.forEach((timer) => clearTimeout(timer))
     this.countTimers.clear()
@@ -486,6 +510,7 @@ export class LiveStore {
   }
 
   private notify(change: ClientChange) {
+    globalState.changes += 1
     this.listeners.forEach((listener) => listener(change))
   }
 

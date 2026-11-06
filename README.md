@@ -231,6 +231,32 @@ export const NotePage = observer(({ noteId }: { noteId: number }) => {
 await DomainsAPI.notes.add({ text, authorId })
 ```
 
+Обёртка не отличает первую загрузку от обновления: проход, которому не хватило данных, прячет всё её тело за заглушкой
+до ответа. События приносят только изменённые записи. Если событие добавило строку в открытый список, а записи по её
+ссылке у клиента нет, один новый ряд спрячет весь список. Чтение, из-за которого страница не должна пропадать, выносят в
+свой компонент со своей обёрткой, и заглушка встаёт только на его месте. Где делить экран, решает приложение: библиотека
+такое чтение не находит.
+
+```tsx
+const AuthorName = observer(
+  ({ authorId }: { authorId: number }) => {
+    return <span>{data.author.get(authorId)?.name}</span>
+  },
+  { fallback: <span>…</span> }
+)
+
+export const NotesPage = observer(() => {
+  return data.note.all().map((note) => (
+    <p key={note.noteId}>
+      {note.text} — <AuthorName authorId={note.authorId} />
+    </p>
+  ))
+})
+```
+
+Смена фильтра внутри обёртки тоже даёт заглушку, если новый запрос не покрыт. Прежний вид до ответа держат
+`startTransition` или `useDeferredValue`. После `client.resync` заглушку показывают все обёртки.
+
 Поток событий открывает приложение и передаёт сообщения в `client.push` и `client.resync`. После обрыва потока
 приложение вызывает `client.resync`: события за время обрыва потеряны.
 
