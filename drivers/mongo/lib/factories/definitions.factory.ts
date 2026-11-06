@@ -69,7 +69,8 @@ export class DefinitionsFactory<T extends CollectionScheme> {
         return {
           type: Schema.Types.Mixed, // сузить до String и Number
           enum: primitive.values,
-          required: !primitive.nullable
+          required: !primitive.nullable,
+          index: primitive.index
         }
       }
       case 'enum': {

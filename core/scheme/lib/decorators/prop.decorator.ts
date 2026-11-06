@@ -1,7 +1,11 @@
 import { TypeMetadataStorage } from '../storages/metadata.storage'
 
-interface BaseOptions {
+interface IndexOption {
+  /** Индекс базы под выборки по полю. */
   index?: boolean
+}
+
+interface BaseOptions extends IndexOption {
   unique?: boolean
 }
 
@@ -38,7 +42,8 @@ export namespace PropertyType {
     values: (string | number)[]
   }
 
-  export interface Literal extends NullableProperty {
+  /** Одно значение из списка: статус, стадия, вид — частые поля выборок, поэтому с индексом. */
+  export interface Literal extends NullableProperty, IndexOption {
     type: 'literal'
     values: (string | number)[]
   }
