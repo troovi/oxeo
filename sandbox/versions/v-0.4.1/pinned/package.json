@@ -1,0 +1,13 @@
+{
+  "name": "@oxeo/sandbox-v-0.4.1-pinned",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Опубликованные пакеты снимка: свой проект вне workspace, иначе npm свяжет их с локальными пакетами-тёзками",
+  "dependencies": {
+    "@oxeo-drivers/memory": "0.3.0",
+    "@oxeo/client": "0.4.0",
+    "@oxeo/react": "0.2.1",
+    "@oxeo/scheme": "0.4.1",
+    "@oxeo/server": "0.4.0"
+  }
+}

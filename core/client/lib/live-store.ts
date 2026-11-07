@@ -1,8 +1,8 @@
 /**
  * Живая часть базы сервера на клиенте: версии записей, результаты запросов и значения представлений. Догружает
  * недостающее пакетами с повторами, применяет события (новые версии записей), сверяя их с живыми запросами, и вызывает
- * операции. Схемы не знает: записи приходят вместе с коллекцией и id. Объект данных и вызовы операций над ним собирает
- * `createClient`.
+ * операции. Схемы не знает: записи приходят вместе с коллекцией и id. Читают его только сборщики (`Tracker`), разовое
+ * чтение и вызовы операций над ним собирает `createClient`.
  */
 import isEqual from 'fast-deep-equal'
 import { compareEntries, matches, windowOf } from '@oxeo/scheme/filter'
@@ -19,7 +19,6 @@ import type {
   QueryResults,
   RecordVersion
 } from '@oxeo/scheme'
-import { globalState } from './global-state'
 import { ClientChange, Tracker, emptyChange } from './tracker'
 
 // types
@@ -43,6 +42,16 @@ export interface ClientOptions {
   refreshDelay?: number
   /** Клиент забыл всё и начинает заново: команда сервера, смена эпохи, разрыв ревизий. */
   onResync?: (reason: string) => void
+  /**
+   * Чтение компонента не удалось: пакет — после повторов, запрос — отказом сервера. Один вызов на пакет: так приложение
+   * показывает отказ там, где компонент его не рисует. Разовое чтение получает отказ промисом и сюда не приходит.
+   */
+  onReadError?: (error: Error) => void
+}
+
+export interface RequestOptions {
+  /** Отказ получит тот, кто ждёт промис: `onReadError` не нужен. */
+  isQuiet?: boolean
 }
 
 /** Сервер отказал запросу: коллекции нет, параметры не прошли схему, представление упало. */
@@ -54,14 +63,6 @@ export class QueryFailedError extends Error {
   ) {
     super(message)
     this.name = 'QueryFailedError'
-  }
-}
-
-/** Чтение вне рендера того, чего у клиента нет: прочитать при рисовании или загрузить явно (`load`). */
-export class UncoveredReadError extends Error {
-  constructor(key: string) {
-    super(`oxeo: ${key} не загружено — прочитайте это при рисовании или загрузите через load`)
-    this.name = 'UncoveredReadError'
   }
 }
 
@@ -86,6 +87,8 @@ interface ViewEntry {
 /** Запросы, которые уйдут одним пакетом в конце такта; `done` — его итог. */
 interface NextBatch {
   queries: Map<string, Query>
+  /** В пакете есть чтения компонентов: его отказ уйдёт в `onReadError`. */
+  isReported: boolean
   done: Promise<void>
 }
 
@@ -141,6 +144,8 @@ export class LiveStore {
   /** Запросы, загрузка которых не удалась: пакет — после повторов, запрос — отказом сервера; значение — ошибка. */
   private failures = new Map<string, Error>()
   private listeners = new Set<(change: ClientChange) => void>()
+  /** Сколько раз менялись данные: сборщик сверяет его, когда подписка появляется позже прохода. */
+  changes = 0
 
   // loading
 
@@ -166,12 +171,22 @@ export class LiveStore {
   private retries: number[]
   private refreshDelay: number
   private onResync: ClientOptions['onResync']
+  private onReadError: ClientOptions['onReadError']
 
-  constructor({ transport, retries = [300, 1000, 3000], refreshDelay = 300, onResync }: ClientOptions) {
+  constructor(options: ClientOptions) {
+    const {
+      transport,
+      retries = [300, 1000, 3000],
+      refreshDelay = 300,
+      onResync,
+      onReadError
+    } = options
+
     this.transport = transport
     this.retries = retries
     this.refreshDelay = refreshDelay
     this.onResync = onResync
+    this.onReadError = onReadError
   }
 
   // coverage
@@ -233,45 +248,38 @@ export class LiveStore {
   // reads
 
   /**
-   * Чтение: в проходе рендера — запомнить прочитанное и, если не покрыто, записать потребность (или отказ, если запрос
-   * уже не удался) и отдать пустое; записи — через прокси сборщика. Вне рендера — только покрытое.
+   * Чтение прохода: запомнить прочитанное и, если не покрыто, записать потребность (или отказ, если запрос уже не удался)
+   * и отдать пустое; записи — через сборщик.
    */
-  read(query: Query) {
-    const tracker = globalState.currentTracker
-
-    if (tracker) {
-      this.watch(tracker, query)
-    }
+  read(query: Query, tracker: Tracker) {
+    this.watch(tracker, query)
 
     if (this.isCovered(query)) {
       return this.valueOf(query, tracker)
     }
 
-    if (tracker === null) {
-      throw new UncoveredReadError(keyOf(query))
-    }
-
     const key = keyOf(query)
+    const failure = this.failures.get(key)
 
-    if (this.failures.has(key)) {
-      tracker.failures.add(key)
+    if (failure) {
+      tracker.failures.set(key, failure)
     }
 
-    if (!this.failures.has(key)) {
+    if (!failure) {
       tracker.needs.set(key, query)
     }
 
     return emptyOf(query)
   }
 
-  /** Значение покрытого запроса; в проходе рендера записи идут через прокси сборщика. */
-  private valueOf(query: Query, tracker: Tracker | null) {
+  /** Значение покрытого запроса; записи идут через сборщик. */
+  private valueOf(query: Query, tracker: Tracker) {
     if (query.kind === 'view') {
       return this.views.get(keyOf(query))!.value
     }
 
     const track = (id: IType, record: object) => {
-      return tracker ? tracker.track(`${query.collection}:${id}`, record) : record
+      return tracker.track(`${query.collection}:${id}`, record)
     }
 
     if (query.kind === 'get') {
@@ -291,35 +299,16 @@ export class LiveStore {
   }
 
   /**
-   * Явная загрузка для обработчика: непокрытое — с сервера, покрытое — сразу; пересинхронизация в пути — снова. Прежний
-   * отказ запроса забывается, новый — ошибка.
+   * Запомнить в сборщике, от чего зависит проход: запись, состав запроса, коллекция целиком, значение. Ключ `get` нужен
+   * ради отказа: изменение несёт его среди запросов.
    */
-  async load(query: Queries.Find) {
-    const key = keyOf(query)
-
-    this.failures.delete(key)
-
-    while (!this.isCovered(query)) {
-      await this.request([query])
-
-      const failure = this.failures.get(key)
-
-      if (failure) {
-        throw failure
-      }
-    }
-
-    return this.read(query) as object[]
-  }
-
-  /** Запомнить в сборщике, от чего зависит проход: запись, состав запроса, коллекция целиком, значение. */
   private watch(tracker: Tracker, query: Query) {
+    tracker.queries.add(keyOf(query))
+
     if (query.kind === 'get') {
       tracker.fieldsOf(`${query.collection}:${query.ids[0]}`)
       return
     }
-
-    tracker.queries.add(keyOf(query))
 
     if (query.kind !== 'view') {
       tracker.collections.add(query.collection)
@@ -329,7 +318,7 @@ export class LiveStore {
   // loading
 
   /** Загрузить запросы: промис разрешается, когда все покрыты, и отклоняется, если пакет не удался после повторов. */
-  async request(queries: Query[]) {
+  async request(queries: Query[], { isQuiet = false }: RequestOptions = {}) {
     const promises = queries.map((query) => {
       const key = keyOf(query)
       const current = this.inflight.get(key)
@@ -340,6 +329,7 @@ export class LiveStore {
 
       this.nextBatch ??= this.createBatch()
       this.nextBatch.queries.set(key, query)
+      this.nextBatch.isReported ||= !isQuiet
       this.inflight.set(key, this.nextBatch.done)
 
       return this.nextBatch.done
@@ -350,10 +340,14 @@ export class LiveStore {
 
   /** Новый пакет: копит запросы до конца такта, затем уходит. */
   private createBatch() {
-    const queries = new Map<string, Query>()
     const tick = new Promise((resolve) => setTimeout(resolve, 0))
+    const batch: NextBatch = {
+      queries: new Map(),
+      isReported: false,
+      done: tick.then(() => this.flush(batch))
+    }
 
-    return { queries, done: tick.then(() => this.flush(queries)) }
+    return batch
   }
 
   /** Забыть отказ запросов перед повтором: следующий проход снова соберёт их как потребности. */
@@ -364,9 +358,9 @@ export class LiveStore {
   /**
    * Отправка накопленного одним пакетом; `get` одной коллекции склеиваются в один список id. Итог пакета пишется в наборы
    * того состояния, в котором он ушёл: у нового состояния они свои. Отказ пакета — отказ всех его запросов; отказ
-   * запроса сервером ставит ответ (`applyAnswer`).
+   * запроса сервером ставит ответ (`applyAnswer`). Итог с отказом уходит в `onReadError` один раз на пакет.
    */
-  private async flush(queries: Map<string, Query>) {
+  private async flush({ queries, isReported }: NextBatch) {
     const keys = [...queries.keys()]
     const batch: QueryBatch = { queries: mergeGets([...queries.values()]) }
     const { inflight, failures } = this
@@ -381,6 +375,12 @@ export class LiveStore {
       throw error
     } finally {
       keys.forEach((key) => inflight.delete(key))
+
+      const failure = keys.map((key) => failures.get(key)).find(Boolean)
+
+      if (failure && isReported) {
+        this.onReadError?.(failure)
+      }
     }
   }
 
@@ -428,7 +428,7 @@ export class LiveStore {
   }
 
   /**
-   * Отказ запроса сервером: непокрытый запрос становится отказавшим — проход покажет вид ошибки обёртки, `load` бросит;
+   * Отказ запроса сервером: непокрытый запрос становится отказавшим — проход отдаст его сборщику, разовое чтение бросит;
    * у покрытого (перезапрос устаревшего) остаётся прежнее значение. Склеенный `get` отказывает за все `get` своей
    * коллекции из пакета.
    */
@@ -463,7 +463,7 @@ export class LiveStore {
     }
 
     if (query.kind === 'view' && 'value' in result) {
-      this.views.set(key, { query, value: result.value, reads: result.reads })
+      this.views.set(key, { query, value: freezeInDev(result.value), reads: result.reads })
       change.queries.add(key)
       return
     }
@@ -720,7 +720,7 @@ export class LiveStore {
   }
 
   private notify(change: ClientChange) {
-    globalState.changes += 1
+    this.changes += 1
     this.listeners.forEach((listener) => listener(change))
   }
 
@@ -734,7 +734,7 @@ export class LiveStore {
     const records = this.records.get(collection) ?? new Map<IType, object | null>()
     const prev = records.get(id) ?? null
 
-    records.set(id, record)
+    records.set(id, freezeInDev(record))
     this.records.set(collection, records)
     change.records.set(`${collection}:${id}`, prev && record && changedFields(prev, record))
 
@@ -775,6 +775,27 @@ const emptyOf = (query: Query) => {
   }
 
   return query.kind === 'count' ? 0 : null
+}
+
+/**
+ * Записи и значения представлений отдаются без копии, поэтому правка на месте молча испортила бы хранилище. В разработке
+ * такая правка падает сразу; в сборке production сборщик приложения эту ветку вырезает.
+ */
+const freezeInDev = <T>(value: T) => {
+  if (process.env.NODE_ENV !== 'production') {
+    deepFreeze(value)
+  }
+
+  return value
+}
+
+const deepFreeze = (value: unknown) => {
+  if (typeof value !== 'object' || value === null || Object.isFrozen(value)) {
+    return
+  }
+
+  Object.freeze(value)
+  Object.values(value).forEach(deepFreeze)
 }
 
 /** Поля верхнего уровня, которые отличаются у двух версий записи. */

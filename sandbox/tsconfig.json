@@ -15,5 +15,5 @@
     "types": ["node", "multer"]
   },
   "include": ["app", "server", "scripts", "versions"],
-  "exclude": ["versions/*/node_modules"]
+  "exclude": ["versions/*/node_modules", "versions/*/pinned"]
 }

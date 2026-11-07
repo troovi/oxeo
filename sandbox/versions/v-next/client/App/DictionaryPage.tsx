@@ -1,20 +1,34 @@
 import { useParams } from 'react-router'
 import { AppPage, RecordFields, RecordsTable } from '../../../../app/kit'
 import { AppKey } from '../../core/keys'
-import { db, live } from '../data'
+import { useDb } from '../data'
+import { LoadState } from './LoadState'
 import { paths } from './paths'
 
+/** Вход маршрута: другой справочник — новый экземпляр записи, иначе до ответа был бы виден прежний. */
+export const DictionaryPage = () => {
+  const { dictionary } = useParams()
+
+  return <DictionaryRecord key={dictionary} dictionaryKey={dictionary as AppKey.Dictionary} />
+}
+
 /** Запись справочника: поля и значения. */
-export const DictionaryPage = live(() => {
-  const params = useParams()
+const DictionaryRecord = ({ dictionaryKey }: { dictionaryKey: AppKey.Dictionary }) => {
+  const state = useDb((db) => {
+    return {
+      dictionary: db.dictionary.get(dictionaryKey),
+      options: db.option.find({ dictionary: dictionaryKey })
+    }
+  })
 
-  const key = params.dictionary as AppKey.Dictionary
+  if (state.stage !== 'success') {
+    return <LoadState state={state} />
+  }
 
-  const dictionary = db.dictionary.get(key)
-  const options = db.option.find({ dictionary: key })
+  const { dictionary, options } = state.data
 
   if (!dictionary) {
-    return <AppPage.Empty>Справочника {params.dictionary} нет</AppPage.Empty>
+    return <AppPage.Empty>Справочника {dictionaryKey} нет</AppPage.Empty>
   }
 
   return (
@@ -25,4 +39,4 @@ export const DictionaryPage = live(() => {
       </AppPage.Section>
     </AppPage>
   )
-})
+}

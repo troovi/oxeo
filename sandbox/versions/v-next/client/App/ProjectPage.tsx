@@ -1,20 +1,32 @@
 import { useNavigate, useParams } from 'react-router'
 import { AppPage, RecordFields, RecordsTable } from '../../../../app/kit'
-import { db, live } from '../data'
+import { useDb } from '../data'
+import { LoadState } from './LoadState'
 import { paths } from './paths'
 
+/** Вход маршрута: другой проект — новый экземпляр записи, иначе до ответа был бы виден прежний. */
+export const ProjectPage = () => {
+  const { projectId } = useParams()
+
+  return <ProjectRecord key={projectId} projectId={Number(projectId)} />
+}
+
 /** Запись проекта: поля (клиент — ссылкой) и смены проекта. */
-export const ProjectPage = live(() => {
-  const params = useParams()
+const ProjectRecord = ({ projectId }: { projectId: number }) => {
   const navigate = useNavigate()
 
-  const projectId = Number(params.projectId)
+  const state = useDb((db) => {
+    return { project: db.project.get(projectId), shifts: db.shift.find({ projectId }) }
+  })
 
-  const project = db.project.get(projectId)
-  const shifts = db.shift.find({ projectId })
+  if (state.stage !== 'success') {
+    return <LoadState state={state} />
+  }
+
+  const { project, shifts } = state.data
 
   if (!project) {
-    return <AppPage.Empty>Проекта {params.projectId} нет</AppPage.Empty>
+    return <AppPage.Empty>Проекта {projectId} нет</AppPage.Empty>
   }
 
   return (
@@ -31,4 +43,4 @@ export const ProjectPage = live(() => {
       </AppPage.Section>
     </AppPage>
   )
-})
+}

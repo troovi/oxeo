@@ -6,7 +6,7 @@
 export * from './client'
 export * from './tracker'
 
-export { QueryFailedError, UncoveredReadError } from './live-store'
+export { QueryFailedError } from './live-store'
 export type { ClientOptions, ClientTransport } from './live-store'
 export type {
   DomainEvent,

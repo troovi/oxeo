@@ -8,7 +8,8 @@
     "server": "tsx watch server/main.ts",
     "app": "vite --config app/vite.config.ts",
     "visual": "node scripts/visual.js",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "pinned": "npm install --prefix versions/v-0.4.1/pinned --legacy-peer-deps --no-workspaces --no-fund --no-audit"
   },
   "dependencies": {
     "@companix/formkit": "latest",

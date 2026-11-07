@@ -1,20 +1,32 @@
 import { useNavigate, useParams } from 'react-router'
 import { AppPage, RecordFields, RecordsTable } from '../../../../app/kit'
-import { db, live } from '../data'
+import { useDb } from '../data'
+import { LoadState } from './LoadState'
 import { paths } from './paths'
 
+/** Вход маршрута: другой клиент — новый экземпляр записи, иначе до ответа был бы виден прежний. */
+export const ClientPage = () => {
+  const { clientId } = useParams()
+
+  return <ClientRecord key={clientId} clientId={Number(clientId)} />
+}
+
 /** Запись клиента: поля (менеджер — ссылкой) и проекты клиента. */
-export const ClientPage = live(() => {
-  const params = useParams()
+const ClientRecord = ({ clientId }: { clientId: number }) => {
   const navigate = useNavigate()
 
-  const clientId = Number(params.clientId)
+  const state = useDb((db) => {
+    return { client: db.client.get(clientId), projects: db.project.find({ clientId }) }
+  })
 
-  const client = db.client.get(clientId)
-  const projects = db.project.find({ clientId })
+  if (state.stage !== 'success') {
+    return <LoadState state={state} />
+  }
+
+  const { client, projects } = state.data
 
   if (!client) {
-    return <AppPage.Empty>Клиента {params.clientId} нет</AppPage.Empty>
+    return <AppPage.Empty>Клиента {clientId} нет</AppPage.Empty>
   }
 
   return (
@@ -31,4 +43,4 @@ export const ClientPage = live(() => {
       </AppPage.Section>
     </AppPage>
   )
-})
+}

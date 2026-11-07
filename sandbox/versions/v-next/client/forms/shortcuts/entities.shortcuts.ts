@@ -1,11 +1,11 @@
 /**
- * Поля выбора записей для форм действий: варианты читает поле formkit через `useOptions`, а не компонент в `live`,
- * поэтому чтение идёт мостом `useData` — поле подписано на записи и показывает загрузку по `isLoading`. Свежие сверху.
- * Выбор одной записи всегда обязателен — он задаёт, над чем действие.
+ * Поля выбора записей для форм действий: варианты читает поле formkit через `useOptions` на `useDb` — поле подписано на
+ * записи и показывает загрузку по `isLoading`. Свежие сверху. Выбор одной записи всегда обязателен — он задаёт, над чем
+ * действие.
  */
 import { SelectForm, SelectTagsForm } from '../../../../../app/kit'
 import { AppKey } from '../../../core/keys'
-import { db, useData } from '../../data'
+import { useDb } from '../../data'
 
 export const EntityShortForms = {
   WorkerSelect: <N extends string>(name: N) => {
@@ -88,7 +88,7 @@ export const EntityShortForms = {
 // options
 
 const useWorkerOptions = () => {
-  const { value: workers, isLoading } = useData(() => db.worker.all())
+  const { data: workers = [], stage } = useDb((db) => db.worker.all())
   const sorted = [...workers].sort((a, b) => b.createdAt - a.createdAt)
 
   const options = sorted.map((worker) => ({
@@ -97,11 +97,11 @@ const useWorkerOptions = () => {
     label: `${worker.type} · ${worker.status}`
   }))
 
-  return { options, isLoading }
+  return { options, isLoading: stage === 'loading' }
 }
 
 const useClientOptions = () => {
-  const { value: clients, isLoading } = useData(() => db.client.all())
+  const { data: clients = [], stage } = useDb((db) => db.client.all())
   const sorted = [...clients].sort((a, b) => b.createdAt - a.createdAt)
 
   const options = sorted.map((client) => ({
@@ -110,11 +110,11 @@ const useClientOptions = () => {
     label: `менеджер #${client.managerId}`
   }))
 
-  return { options, isLoading }
+  return { options, isLoading: stage === 'loading' }
 }
 
 const useProjectOptions = () => {
-  const { value: projects, isLoading } = useData(() => db.project.all())
+  const { data: projects = [], stage } = useDb((db) => db.project.all())
   const sorted = [...projects].sort((a, b) => b.createdAt - a.createdAt)
 
   const options = sorted.map((project) => ({
@@ -123,11 +123,11 @@ const useProjectOptions = () => {
     label: project.stage
   }))
 
-  return { options, isLoading }
+  return { options, isLoading: stage === 'loading' }
 }
 
 const useShiftOptions = () => {
-  const { value: shifts, isLoading } = useData(() => db.shift.all())
+  const { data: shifts = [], stage } = useDb((db) => db.shift.all())
   const sorted = [...shifts].sort((a, b) => b.createdAt - a.createdAt)
 
   const options = sorted.map((shift) => ({
@@ -136,11 +136,11 @@ const useShiftOptions = () => {
     label: `${shift.stage} · ${shift.participantIds.length} чел.`
   }))
 
-  return { options, isLoading }
+  return { options, isLoading: stage === 'loading' }
 }
 
 const useParticipantOptions = () => {
-  const { value: participants, isLoading } = useData(() => db.participant.all())
+  const { data: participants = [], stage } = useDb((db) => db.participant.all())
   const sorted = [...participants].sort((a, b) => b.addedAt - a.addedAt)
 
   const options = sorted.map((participant) => ({
@@ -149,11 +149,11 @@ const useParticipantOptions = () => {
     label: `${participant.role} · ${participant.attendance ?? 'без явки'}`
   }))
 
-  return { options, isLoading }
+  return { options, isLoading: stage === 'loading' }
 }
 
 const useOptionOptions = () => {
-  const { value: options, isLoading } = useData(() => db.option.all())
+  const { data: options = [], stage } = useDb((db) => db.option.all())
 
   const items = options.map((option) => ({
     value: option.value,
@@ -161,13 +161,13 @@ const useOptionOptions = () => {
     label: option.dictionary
   }))
 
-  return { options: items, isLoading }
+  return { options: items, isLoading: stage === 'loading' }
 }
 
 /** Значения одного справочника — запрос по словарю, а не все значения. */
 const useDictionaryOptions = (dictionary: AppKey.Dictionary) => {
-  const { value: options, isLoading } = useData(() => db.option.find({ dictionary }))
+  const { data: options = [], stage } = useDb((db) => db.option.find({ dictionary }))
   const items = options.map((option) => ({ value: option.value, title: option.title }))
 
-  return { options: items, isLoading }
+  return { options: items, isLoading: stage === 'loading' }
 }

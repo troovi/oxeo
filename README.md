@@ -263,74 +263,148 @@ runtime.query(batch, identity)
 ```ts
 // client/data.ts
 import { createClient } from '@oxeo/client'
-import { createLive, createUseData } from '@oxeo/react'
+import type { DbApi, ViewsApi } from '@oxeo/client'
+import { createUseDb } from '@oxeo/react'
 import type { AppDomains } from '../core/domains'
 import type { AppScheme } from '../core/scheme'
 
-export const client = createClient<AppScheme, AppDomains, AppViews>({ transport })
+export const client = createClient<AppScheme, AppDomains, AppViews>({
+  transport,
+  onReadError: () => toast('Не удалось загрузить данные')
+})
 
-export const { db, views, DomainsAPI } = client
-export const live = createLive(client, { fallback: <Spinner />, error: (props) => <LoadError {...props} /> })
-export const useData = createUseData(client)
+export const { DomainsAPI, read: readDb } = client
+export const useDb = createUseDb(client)
+
+export type Db = DbApi<AppScheme>
+export type Views = ViewsApi<AppViews>
 ```
 
-Компонент в обёртке `live` читает данные прямыми вызовами. Недостающее уходит одним пакетом запросов, а пока ответа нет,
-обёртка рисует заглушку. Код компонента о загрузке не знает.
+### Чтение
+
+Читают данные только через хук `useDb`. `db` и значения представлений существуют только параметрами его колбэка, поэтому
+прочитать мимо подписки нельзя: глобального объекта данных нет. Всё, чего не хватило, уходит одним пакетом запросов.
+
+Хук отдаёт состояние, а что рисовать, решает компонент. Заглушки и вида ошибки у библиотеки нет.
+
+```ts
+type DbState<T> =
+  | { stage: 'loading'; data: undefined }
+  | { stage: 'error'; data: T | undefined; retry: () => void }
+  | { stage: 'success'; data: T; isUpdating: boolean }
+```
+
+`data` есть в каждой стадии. Мелкой части экрана хватает одной проверки, страница смотрит на стадию: ей надо отличить
+загрузку от записи, которой нет.
 
 ```tsx
-export const NotePage = live(({ noteId }: { noteId: number }) => {
-  const note = db.note.get(noteId)
+// мелкая часть: загрузка, отказ и «записи нет» — одна проверка
+export const AuthorName = ({ authorId }: { authorId: number }) => {
+  const { data: author } = useDb((db) => db.author.get(authorId))
 
-  if (!note) {
+  if (!author) {
+    return null
+  }
+
+  return <span>{author.name}</span>
+}
+
+// страница
+export const NotePage = ({ noteId }: { noteId: number }) => {
+  const state = useDb((db) => db.note.get(noteId))
+
+  if (state.stage !== 'success') {
+    return <LoadState state={state} />
+  }
+
+  if (!state.data) {
     return <NotFound />
   }
 
-  return <NoteView note={note} author={db.author.get(note.authorId)} />
-})
+  return <NoteView note={state.data} />
+}
 
 // операция: исполняет сервер, после await клиент уже держит новые версии записей
 await DomainsAPI.notes.add({ text, authorId })
 ```
 
-Обёртка не отличает первую загрузку от обновления: проход, которому не хватило данных, прячет всё её тело за заглушкой
-до ответа. События приносят только изменённые записи. Если событие добавило строку в открытый список, а записи по её
-ссылке у клиента нет, один новый ряд спрячет весь список. Чтение, из-за которого страница не должна пропадать, выносят в
-свой компонент со своей обёрткой, и заглушка встаёт только на его месте. Где делить экран, решает приложение: библиотека
-такое чтение не находит.
+Колбэк выполняется целиком: чтение, которому не хватило данных, отдаёт пустое (`null`, `[]`, `0`), и колбэк идёт дальше,
+поэтому независимые чтения уходят одним пакетом. Неполный результат наружу не выходит. Условное чтение — условие в
+колбэке. Ошибка полного прохода — настоящая, она идёт в границу ошибок React.
 
-```tsx
-const AuthorName = live(
-  ({ authorId }: { authorId: number }) => {
-    return <span>{db.author.get(authorId)?.name}</span>
-  },
-  { fallback: <span>…</span> }
-)
+Чтение, нужное нескольким местам, — обычная функция с параметром `db`. Требование видно в сигнатуре, такие функции
+складываются друг с другом, и их одинаково зовут `useDb` и `readDb`.
 
-export const NotesPage = live(() => {
-  return db.note.all().map((note) => (
-    <p key={note.noteId}>
-      {note.text} — <AuthorName authorId={note.authorId} />
-    </p>
-  ))
-})
+```ts
+const readNoteCard = (db: Db, noteId: number) => {
+  const note = db.note.get(noteId)
+
+  return note && { note, author: db.author.get(note.authorId) }
+}
+
+const state = useDb((db) => readNoteCard(db, noteId))
 ```
 
-Смена фильтра внутри обёртки тоже даёт заглушку, если новый запрос не покрыт. Прежний вид до ответа держат
-`startTransition` или `useDeferredValue`. После `client.resync` заглушку показывают все обёртки.
+### Прежний результат
 
-Значение представления читается так же: `views.<view>.<method>(params)` в обёртке подписывает и догружает, вне неё
-отдаёт только покрытое. Событие, которое тронуло коллекции, прочитанные представлением, ставит перезапрос значения;
-события подряд дают один пакет, до ответа виден прежний результат.
+Хук держит последний полный результат. Пока догружается новое — сменился фильтр, событие принесло строку со ссылкой на
+незагруженную запись, клиент пересинхронизировался, — стадия остаётся `success` с прежними данными и `isUpdating`. Экран
+не мигает, и поддерживать это в компоненте не нужно.
+
+Производное, которое должно совпадать с данными, считается внутри колбэка: иначе новый период встретится с записями
+прежнего. Другая запись — новый экземпляр компонента через `key`: иначе до ответа виден прежний результат.
 
 ```tsx
-export const AuthorCard = live(({ authorId }: { authorId: number }) => {
-  const drafts = views.stats.drafts({ authorId })
-  const latest = db.note.find(
-    { authorId },
-    { order: { field: 'createdAt', direction: 'desc' }, limit: 5 }
-  )
+<NoteDesk key={noteId} noteId={noteId} />
+```
 
-  return <Card drafts={drafts} notes={latest} />
+### Записи
+
+Запись — прокси над неизменяемой версией: он запоминает прочитанные поля, и компонент перерисовывается только на их
+изменение. Прокси новый на каждом проходе, поэтому записи сравнивают по id, а в зависимостях хуков пишут id и примитивы.
+
+Записи и значения представлений отдаются без копии. Вне `production` они заморожены вглубь: правка на месте падает
+сразу, а не портит данные клиента молча. Режим определяет `process.env.NODE_ENV`, его подставляет сборщик приложения; в
+сборке `production` эта ветка вырезается. Копия для правки — `structuredClone` простой записи.
+
+Если хуку нужны прочитанные данные, компонент делится на загрузчик и тело: загрузчик читает, тело получает данные
+пропсами. Форме нужна запись на момент открытия, а чтение её полей через прокси подписало бы компонент на запись. Для
+этого есть второй аргумент: `once` отдаёт первый полный результат простыми объектами, и дальше хук не подписан.
+
+```tsx
+export const NoteEditDialog = ({ noteId, close }: NoteEditDialogProps) => {
+  const { data: note } = useDb((db) => db.note.get(noteId), { once: true })
+
+  if (!note) {
+    return null
+  }
+
+  return <NoteEditForm note={note} close={close} />
+}
+```
+
+### Разовое чтение
+
+Обработчику `db` недоступен. Он читает `readDb` — тем же колбэком и теми же функциями чтения: покрытое разрешается
+сразу, зависимые чтения догружаются сами, записи простые, подписки нет.
+
+```ts
+await DomainsAPI.notes.publish({ noteId })
+
+const note = await readDb((db) => db.note.get(noteId))
+```
+
+### Значения представлений
+
+Значение представления — второй параметр колбэка. Событие, которое тронуло коллекции, прочитанные представлением, ставит
+перезапрос значения; события подряд дают один пакет, до ответа виден прежний результат.
+
+```tsx
+const { data } = useDb((db, views) => {
+  return {
+    drafts: views.stats.drafts({ authorId }),
+    latest: db.note.find({ authorId }, { order: { field: 'createdAt', direction: 'desc' }, limit: 5 })
+  }
 })
 ```
 
@@ -338,9 +412,15 @@ export const AuthorCard = live(({ authorId }: { authorId: number }) => {
 и та выходит. Если из полного окна ушла запись или худшая сдвинулась дальше, следующая неизвестна: окно перезапрашивается,
 а до ответа показывает прежний состав без ушедшей. Над коллекцией, загруженной целиком, окно считается на месте.
 
-Отказ запроса сервером видит только та обёртка, которая этот запрос прочитала: она рисует вид ошибки с повтором, а
-соседние обёртки показывают свои данные. `load` такого запроса бросает `QueryFailedError` с кодом сервера. Если
-отказал перезапрос устаревшего значения, прежнее значение остаётся.
+### Отказ
+
+Отказ запроса сервером видит только тот хук, который этот запрос прочитал, соседи показывают свои данные. Хук отдаёт
+стадию `error` с `retry`, прежние данные остаются в `data`. Опция клиента `onReadError` сообщает об отказе один раз на
+пакет: так приложение показывает его там, где компонент вида ошибки не рисует. Новый монтаж запрашивает упавшее заново.
+`readDb` получает отказ промисом (`QueryFailedError` с кодом сервера) и в `onReadError` не приходит. Если отказал
+перезапрос устаревшего значения, прежнее значение остаётся.
+
+### Поток событий
 
 Поток событий открывает приложение и передаёт сообщения в `client.push` и `client.resync`. После обрыва потока
 приложение вызывает `client.resync`: события за время обрыва потеряны.
@@ -355,7 +435,7 @@ export const AuthorCard = live(({ authorId }: { authorId: number }) => {
 | `core/scheme`    | `@oxeo/scheme`         | декораторы, `DataScheme`, `schemaOf`, контракт доменов, представлений и коллекций, фильтр, протокол | `core`; клиент — только типы |
 | `core/server`    | `@oxeo/server`         | `DataSource`, `DataProcessor`, `DomainRuntime`, договор драйвера                                    | сервер                       |
 | `core/client`    | `@oxeo/client`         | живая часть базы, чтения, пакеты запросов, события, вызовы операций                                 | клиент                       |
-| `core/react`     | `@oxeo/react`          | `createLive`, `createUseData`                                                                       | клиент на React              |
+| `core/react`     | `@oxeo/react`          | `createUseDb`                                                                                       | клиент на React              |
 | `core/types`     | `@oxeo/types`          | типы HTTP-маршрутов и файлов                                                                        | приложения                   |
 | `drivers/mongo`  | `@oxeo-drivers/mongo`  | драйвер MongoDB, модуль NestJS                                                                      | сервер                       |
 | `drivers/memory` | `@oxeo-drivers/memory` | драйвер в памяти процесса                                                                           | тесты доменов, песочницы     |

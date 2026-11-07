@@ -1,12 +1,11 @@
 /**
  * Слой данных клиента на oxeo 1.0: клиент держит живую часть базы сервера — то, что прочитали страницы, — и получает
  * изменения событиями. Схема и домены — только типами: ни декораторов, ни классов доменов в сборке клиента нет.
- * Компоненты, которые читают данные, — в обёртке `live`; код, который зовут чужие компоненты (`useOptions` formkit),
- * читает через мост `useData`. Запросы идут через `network` kit — их видит панель Networks.
+ * Читают данные только через `useDb`: `db` и значения представлений живут параметрами его колбэка. Запросы идут через
+ * `network` kit — их видит панель Networks.
  */
-import { createElement } from 'react'
-import { AppPage, createStore, network } from '../../../app/kit'
-import { DomainEvent, QueryAnswer, createClient, createLive, createUseData } from '../lib/client'
+import { createStore, network, toaster } from '../../../app/kit'
+import { DomainEvent, QueryAnswer, createClient, createUseDb } from '../lib/client'
 import type { AppDomains } from '../core/domains'
 import type { AppScheme } from '../core/scheme'
 import type { AppViews } from '../core/views'
@@ -62,7 +61,8 @@ export const session = createStore<SessionState>({
 
 /**
  * Клиент версии: пакеты запросов — `POST data/query`, вызовы — `POST domains/<domain>/<method>` от имени системы (без
- * `x-worker-id`). Пересинхронизация мягкая: клиент забывает всё, смонтированные страницы перезапрашивают своё.
+ * `x-worker-id`). Пересинхронизация мягкая: клиент забывает всё, смонтированные страницы перезапрашивают своё. Отказ
+ * чтения виден тостом: мелкие части экрана вида ошибки не рисуют.
  */
 export const client = createClient<AppScheme, AppDomains, AppViews>({
   transport: {
@@ -71,20 +71,14 @@ export const client = createClient<AppScheme, AppDomains, AppViews>({
   },
   onResync: (reason) => {
     session.set({ resync: reason })
+  },
+  onReadError: () => {
+    toaster.danger('Не удалось загрузить данные')
   }
 })
 
-/**
- * Объект данных, значения представлений и вызовы операций: промис вызова разрешается, когда событие применено у
- * клиента.
- */
-export const { db, views, DomainsAPI } = client
+/** Вызовы операций: промис разрешается, когда событие применено у клиента. Разовое чтение — для обработчиков. */
+export const { DomainsAPI, read: readDb } = client
 
-/** Обёртка компонентов, которые читают данные; умолчания — заглушка и вид ошибки страницы kit. */
-export const live = createLive(client, {
-  fallback: createElement(AppPage.Loading),
-  error: ({ retry }) => createElement(AppPage.Failed, { onRetry: retry })
-})
-
-/** Мост для кода, который вызывают чужие компоненты: `useOptions` полей formkit. */
-export const useData = createUseData(client)
+/** Чтение в компонентах. */
+export const useDb = createUseDb(client)

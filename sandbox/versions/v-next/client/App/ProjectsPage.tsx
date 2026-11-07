@@ -1,20 +1,25 @@
 import { useNavigate } from 'react-router'
 import { AppPage, RecordsTable } from '../../../../app/kit'
-import { db, live } from '../data'
+import { useDb } from '../data'
+import { LoadState } from './LoadState'
 import { paths } from './paths'
 
 /** Все проекты, свежие сверху; строка ведёт в запись. */
-export const ProjectsPage = live(() => {
+export const ProjectsPage = () => {
   const navigate = useNavigate()
 
-  const projects = db.project.all()
+  const state = useDb((db) => db.project.all())
 
   return (
-    <AppPage title="Проекты" aside={projects.length}>
-      <RecordsTable
-        rows={[...projects].sort((a, b) => b.createdAt - a.createdAt)}
-        onRowClick={(project) => navigate(paths.project(project.projectId))}
-      />
+    <AppPage title="Проекты" aside={state.data?.length}>
+      {state.stage === 'success' ? (
+        <RecordsTable
+          rows={[...state.data].sort((a, b) => b.createdAt - a.createdAt)}
+          onRowClick={(project) => navigate(paths.project(project.projectId))}
+        />
+      ) : (
+        <LoadState state={state} />
+      )}
     </AppPage>
   )
-})
+}

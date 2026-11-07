@@ -1,8 +1,9 @@
 /**
- * Клиент — то, чем пользуется приложение: объект данных `db`, значения представлений `views` и вызовы операций
- * `DomainsAPI` над живой частью базы `LiveStore`. Домены и представления клиент не исполняет, схема, домены и
- * представления нужны ему только типами: в рантайме от `@oxeo/scheme` он берёт лишь вход `filter`, а имена коллекций,
- * представлений и операций получает прокси в момент обращения. Привязка к React — `@oxeo/react`.
+ * Клиент — то, чем пользуется приложение: разовое чтение `read` и вызовы операций `DomainsAPI` над живой частью базы
+ * `LiveStore`. `db` и значения представлений наружу не выходят: они живут только параметрами колбэка чтения. Домены и
+ * представления клиент не исполняет, схема, домены и представления нужны ему только типами: в рантайме от `@oxeo/scheme`
+ * он берёт лишь вход `filter`, а имена коллекций, представлений и операций получает прокси в момент обращения. Привязка к
+ * React — `@oxeo/react`.
  */
 import type {
   CollectionScheme,
@@ -18,14 +19,14 @@ import type {
   Where
 } from '@oxeo/scheme'
 import { ClientOptions, LiveStore } from './live-store'
-import { ClientChange } from './tracker'
+import { ClientChange, Read, Tracker, TrackerOptions } from './tracker'
 
 // types
 
 /**
- * Чтения коллекции. В проходе рендера (привязка поставила сборщик) чтение подписывает и, если данных нет, записывает
- * потребность и отдаёт пустое того же вида (`null`, `[]`, `0`). Вне рендера отдаёт только покрытое, непокрытое —
- * `UncoveredReadError`.
+ * Чтения коллекции — параметр колбэка чтения. Чтение подписывает и, если данных нет, записывает потребность и отдаёт
+ * пустое того же вида (`null`, `[]`, `0`): колбэк идёт дальше, все независимые чтения уходят одним пакетом, а неполный
+ * результат наружу не выходит.
  */
 export interface CollectionReader<T, I extends IType> {
   /** Запись по id; `null` — записи нет. */
@@ -39,8 +40,6 @@ export interface CollectionReader<T, I extends IType> {
   all(): T[]
   /** Число записей по фильтру, без фильтра — всех; перезапрашивается при изменениях коллекции. */
   count(where?: Where<T>): number
-  /** Явная загрузка для обработчика: непокрытое — с сервера, покрытое — сразу; без фильтра — коллекция целиком. */
-  load(where?: Where<T>, opts?: FindOptions<T>): Promise<T[]>
 }
 
 /** Объект данных: `db.<collection>`, типы — из схемы. */
@@ -49,10 +48,9 @@ export type DbApi<Scheme extends CollectionScheme> = {
 }
 
 /**
- * Значения представлений: `views.<view>.<method>(params)`, типы — из сигнатур методов класса. Чтение как у `db`: в
- * проходе рендера подписывает и, если значения нет, записывает потребность (пустое — `null`, проход отбросится), вне
- * рендера отдаёт только покрытое. Значение перезапрашивается, когда событие тронет коллекции, которые представление
- * читало.
+ * Значения представлений: `views.<view>.<method>(params)`, типы — из сигнатур методов класса. Чтение как у `db`: подписывает
+ * и, если значения нет, записывает потребность (пустое — `null`, проход отбросится). Значение перезапрашивается, когда
+ * событие тронет коллекции, которые представление читало.
  */
 export type ViewsApi<T extends ViewsMap> = {
   [V in keyof T]: {
@@ -74,6 +72,14 @@ export type DomainsApi<T extends DomainsMap> = {
   }
 }
 
+/** Клиент глазами привязки к фреймворку: сборщик прохода, загрузка его потребностей, отказы, подписка на изменения. */
+export interface BindingClient<Db, Views> {
+  createTracker(options?: TrackerOptions): Tracker<Db, Views>
+  request(queries: Query[]): Promise<void>
+  forgetFailures(keys: string[]): void
+  subscribe(listener: (change: ClientChange) => void): () => void
+}
+
 /**
  * Клиент. Типы схемы, доменов и представлений — параметрами (`createClient<AppScheme, AppDomains, AppViews>(…)`): в
  * рантайме ни схемы, ни доменов, ни представлений клиенту не нужно. Поток событий открывает приложение и передаёт
@@ -87,55 +93,14 @@ export const createClient = <
   options: ClientOptions
 ) => {
   const store = new LiveStore(options)
-  const readers = new Map<string, CollectionReader<object, IType>>()
 
-  const db = new Proxy({} as DbApi<Scheme>, {
-    get: (_, collection) => {
-      if (!isMethodKey(collection)) {
-        return undefined
-      }
-
-      if (!readers.has(collection)) {
-        readers.set(collection, {
-          get: (id) => {
-            return store.read({ kind: 'get', collection, ids: [id] }) as object | null
-          },
-          find: (where, opts = {}) => {
-            return store.read({ kind: 'find', collection, where, ...opts }) as object[]
-          },
-          all: () => {
-            return store.read({ kind: 'find', collection, where: null }) as object[]
-          },
-          count: (where) => {
-            return store.read({ kind: 'count', collection, where: where ?? null }) as number
-          },
-          load: (where, opts = {}) => {
-            return store.load({ kind: 'find', collection, where: where ?? null, ...opts })
-          }
-        })
-      }
-
-      return readers.get(collection)!
-    }
-  })
-
-  const views = new Proxy({} as ViewsApi<Views>, {
-    get: (_, view) => {
-      if (!isMethodKey(view)) {
-        return undefined
-      }
-
-      return new Proxy({} as Record<string, unknown>, {
-        get: (__, method) => {
-          if (!isMethodKey(method)) {
-            return undefined
-          }
-
-          return (params: unknown) => store.read({ kind: 'view', view, method, params })
-        }
-      })
-    }
-  })
+  const createTracker = (trackerOptions: TrackerOptions = {}) => {
+    return new Tracker<DbApi<Scheme>, ViewsApi<Views>>({
+      ...trackerOptions,
+      store,
+      createReaders: (read) => ({ db: createDb<Scheme>(read), views: createViews<Views>(read) })
+    })
+  }
 
   const DomainsAPI = new Proxy({} as DomainsApi<Domains>, {
     get: (_, domain) => {
@@ -156,9 +121,35 @@ export const createClient = <
   })
 
   return {
-    db,
-    views,
     DomainsAPI,
+    /**
+     * Разовое чтение для обработчика: тот же колбэк, что у привязки, записи простые, подписки нет. Покрытое разрешается
+     * сразу, зависимые чтения догружаются проходами. Прежний отказ не в счёт, новый отклоняет промис и в `onReadError` не
+     * приходит: его показывает тот, кто ждёт. Пересинхронизация в пути — чтение запрашивает снова.
+     */
+    read: async <R>(read: Read<DbApi<Scheme>, ViewsApi<Views>, R>) => {
+      const tracker = createTracker({ plain: true })
+      const state = { pass: tracker.run(read) }
+
+      if (tracker.failures.size > 0) {
+        store.forgetFailures([...tracker.failures.keys()])
+        state.pass = tracker.run(read)
+      }
+
+      while (!state.pass.isComplete) {
+        const [failure] = tracker.failures.values()
+
+        if (failure) {
+          throw failure
+        }
+
+        await store.request([...tracker.needs.values()], { isQuiet: true })
+
+        state.pass = tracker.run(read)
+      }
+
+      return state.pass.value
+    },
     /** Событие из потока. */
     push: (event: DomainEvent) => {
       store.push(event)
@@ -167,7 +158,8 @@ export const createClient = <
     resync: (reason: string) => {
       store.resync(reason)
     },
-    /** Для привязки: загрузка потребностей прохода, отказы, подписка на изменения. */
+    /** Для привязки: сборщик прохода, загрузка его потребностей, отказы, подписка на изменения. */
+    createTracker,
     request: (queries: Query[]) => {
       return store.request(queries)
     },
@@ -180,9 +172,62 @@ export const createClient = <
   }
 }
 
-export type OxeoClient = ReturnType<typeof createClient>
-
 // helpers
+
+type ReadQuery = (query: Query) => unknown
+
+/** Объект данных сборщика: читатели коллекций заводятся при первом обращении. */
+const createDb = <Scheme extends CollectionScheme>(read: ReadQuery) => {
+  const readers = new Map<string, CollectionReader<object, IType>>()
+
+  return new Proxy({} as DbApi<Scheme>, {
+    get: (_, collection) => {
+      if (!isMethodKey(collection)) {
+        return undefined
+      }
+
+      if (!readers.has(collection)) {
+        readers.set(collection, {
+          get: (id) => {
+            return read({ kind: 'get', collection, ids: [id] }) as object | null
+          },
+          find: (where, opts = {}) => {
+            return read({ kind: 'find', collection, where, ...opts }) as object[]
+          },
+          all: () => {
+            return read({ kind: 'find', collection, where: null }) as object[]
+          },
+          count: (where) => {
+            return read({ kind: 'count', collection, where: where ?? null }) as number
+          }
+        })
+      }
+
+      return readers.get(collection)!
+    }
+  })
+}
+
+/** Значения представлений сборщика. */
+const createViews = <Views extends ViewsMap>(read: ReadQuery) => {
+  return new Proxy({} as ViewsApi<Views>, {
+    get: (_, view) => {
+      if (!isMethodKey(view)) {
+        return undefined
+      }
+
+      return new Proxy({} as Record<string, unknown>, {
+        get: (__, method) => {
+          if (!isMethodKey(method)) {
+            return undefined
+          }
+
+          return (params: unknown) => read({ kind: 'view', view, method, params })
+        }
+      })
+    }
+  })
+}
 
 /**
  * Не-строковые ключи и `then` не становятся коллекциями и вызовами: иначе `await` или возврат прокси из
