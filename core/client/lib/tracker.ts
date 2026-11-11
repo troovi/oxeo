@@ -121,10 +121,11 @@ export class Trace {
     for (const [key, changed] of change.records) {
       const fields = this.records.get(key)
 
-      if (
-        fields &&
-        (changed === null || fields.size === 0 || changed.some((field) => fields.has(field)))
-      ) {
+      if (!fields) {
+        continue
+      }
+
+      if (changed === null || fields.size === 0 || changed.some((field) => fields.has(field))) {
         return true
       }
     }
