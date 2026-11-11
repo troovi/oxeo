@@ -21,6 +21,7 @@ import type {
   ParamsSchema,
   Queries,
   Query,
+  QueryAnswer,
   QueryBatch,
   QueryError,
   QueryResult,
@@ -347,9 +348,12 @@ export class DomainRuntime<
   /**
    * Пакет запросов клиента — мимо очереди вызовов, поэтому чтение может застать операцию на середине: итоговые версии
    * принесёт её событие. Сначала каждый запрос пакета, затем захват записей, на которые ведут ссылки отданных записей,
-   * на один уровень. Отказ запроса — его результат `{ error }`: остальные запросы пакета отвечены.
+   * на один уровень. Отказ запроса — его результат `{ error }`: остальные запросы пакета отвечены. Ответ несёт эпоху и
+   * ревизию, последнюю выданную до начала расчёта: всё, что было до неё, ответ учёл, — по ней клиент склеивает ответ с
+   * событиями, пришедшими в другом порядке.
    */
-  async query({ queries }: QueryBatch, identity: Identity | null = null) {
+  async query({ queries }: QueryBatch, identity: Identity | null = null): Promise<QueryAnswer> {
+    const revision = this.lastRevision
     const versions: AnswerVersions = new Map()
     const results: QueryResult[] = []
     const viewer = { ctx: null as ViewContext<Actor> | null }
@@ -371,7 +375,7 @@ export class DomainRuntime<
 
     await this.capture(versions)
 
-    return { records: [...versions.values()], results }
+    return { epoch: this.epoch, revision, records: [...versions.values()], results }
   }
 
   /** Один запрос пакета: записи — в ответ, результат — их id или число. */

@@ -70,6 +70,8 @@ interface FindEntry {
   query: Queries.Find
   where: object
   ids: Set<IType>
+  /** Ревизия ответа, который задал состав: события не новее неё он уже учёл. */
+  revision: number
 }
 
 interface CountEntry {
@@ -96,6 +98,11 @@ interface ApplyResultParams {
   query: Query
   result: Exclude<QueryResult, QueryResults.Failure>
   change: ClientChange
+  /**
+   * Ревизия ответа (`answeredAt`; у ответа без ревизии — докуда дошёл поток): ею помечаются состав `find`, коллекция
+   * целиком и записи, которых нет.
+   */
+  revision: number
 }
 
 interface ApplyAnswerParams {
@@ -120,8 +127,36 @@ interface ApplyMembershipParams {
 
 interface ApplyWindowParams extends ApplyMembershipParams {
   key: string
-  /** Прежняя версия записи: сдвинул ли её порядок. */
+  /** Прежняя версия записи: сдвинул ли её порядок; `null` — неизвестно, считается сдвинутой. */
   prev: object | null
+}
+
+interface ApplyVersionParams {
+  version: RecordVersion
+  /** Ревизия события, которое принесло версию. */
+  revision: number
+  change: ClientChange
+  /** Ключи запросов, чей состав пересчитать; без них — всех живых `find`. */
+  keys?: Set<string>
+}
+
+interface ReplayParams {
+  batch: QueryBatch
+  /** Ревизия ответа: события не новее неё он уже учёл. */
+  revision: number
+  change: ClientChange
+}
+
+interface PutParams {
+  version: RecordVersion
+  change: ClientChange
+  /** Ревизия события, которое принесло версию, или ответа (`answeredAt`). */
+  revision: number
+}
+
+/** Пакет в пути: докуда дошёл поток, когда пакет ушёл. */
+interface BatchTicket {
+  revision: number
 }
 
 /** Запись вместе с id: схемы у клиента нет, и какое поле записи — id, он не знает. */
@@ -135,8 +170,16 @@ export class LiveStore {
    * сервер её не нашёл или событие её удалило.
    */
   private records = new Map<string, Map<IType, object | null>>()
-  /** Коллекции, загруженные целиком: любой запрос к ним отвечается на месте. */
-  private complete = new Set<string>()
+  /**
+   * Ревизии версий записей: событие какой ревизии или ответ с какой ревизией положил версию (или узнал, что записи нет).
+   * Версия старше известной не кладётся — так ответ и события склеиваются в любом порядке прихода.
+   */
+  private revisions = new Map<string, Map<IType, number>>()
+  /**
+   * Коллекции, загруженные целиком, и ревизия ответа, который их загрузил: любой запрос к ним отвечается на месте, а
+   * событие не новее этой ревизии новой записи не добавит — ответ его уже учёл.
+   */
+  private complete = new Map<string, number>()
   /** Живые запросы по ключу. */
   private finds = new Map<string, FindEntry>()
   private counts = new Map<string, CountEntry>()
@@ -162,8 +205,15 @@ export class LiveStore {
 
   /** Эпоха потока событий; `null` — первого события ещё не было. */
   private epoch: string | null = null
-  /** Докуда дошёл поток: растёт только на его событиях. */
+  /** Докуда дошёл поток: растёт только на его событиях; `0` — событий ещё не было. */
   private revision = 0
+  /** Пакеты в пути: событий новее их ревизий потока ответ мог не учесть. */
+  private batches = new Set<BatchTicket>()
+  /**
+   * События, пришедшие, пока пакеты в пути: ответ, снятый раньше события, заново применяет его к своим запросам. Пустеет,
+   * когда пакетов в пути нет.
+   */
+  private journal: DomainEvent[] = []
 
   // options
 
@@ -386,10 +436,13 @@ export class LiveStore {
 
   /**
    * Пакет на сервер с повторами и ответ в хранилище. Пока пакет шёл, клиент мог забыть всё: такой ответ снят с прежнего
-   * состояния и не кладётся, а его отказ уже никому не нужен.
+   * состояния и не кладётся, а его отказ уже никому не нужен. Пока пакет в пути, события копятся в журнале.
    */
   private async send(batch: QueryBatch, origins: Map<string, Query> = new Map()) {
-    const { generation } = this
+    const { generation, batches } = this
+    const ticket: BatchTicket = { revision: this.revision }
+
+    batches.add(ticket)
 
     try {
       const answer = await withRetries(() => this.transport.query(batch), this.retries)
@@ -401,17 +454,34 @@ export class LiveStore {
       if (generation === this.generation) {
         throw error
       }
+    } finally {
+      batches.delete(ticket)
+      this.trimJournal()
     }
   }
 
   /**
-   * Ответ в хранилище. Склейка ответа с событиями, пришедшими в другом порядке, — известная проблема первой версии:
-   * ответ кладётся как есть.
+   * Ответ в хранилище, склеенный с событиями. Ответ отражает базу не раньше своей ревизии: версия записи, которую клиент
+   * знает от события новее, остаётся, а события новее ответа, пришедшие, пока пакет был в пути, применяются к его
+   * запросам заново, — так запись, которую событие принесло раньше, чем её ждал запрос, не теряется. Ответ другой эпохи
+   * значит, что сервер перезапущен: клиент забывает всё. Ответ без ревизии (сервер прежней версии) кладётся как есть.
    */
   private applyAnswer({ batch, answer, origins }: ApplyAnswerParams) {
+    const isTracked = typeof answer.revision === 'number'
+
+    if (isTracked && !this.adoptEpoch(answer.epoch)) {
+      this.resync('epoch')
+      return
+    }
+
+    const revision = isTracked ? answeredAt(answer.revision) : this.revision
     const change = emptyChange()
 
-    answer.records.forEach((version) => this.put(version, change))
+    for (const version of answer.records) {
+      if (!isTracked || !this.isOutdated(version, revision)) {
+        this.put({ version, change, revision })
+      }
+    }
 
     batch.queries.forEach((query, i) => {
       const result = answer.results[i]
@@ -421,10 +491,66 @@ export class LiveStore {
         return
       }
 
-      this.applyResult({ query, result, change })
+      this.applyResult({ query, result, change, revision })
     })
 
+    if (isTracked) {
+      this.replay({ batch, revision: answer.revision, change })
+    }
+
     this.notify(change)
+  }
+
+  /**
+   * События новее ответа, пришедшие, пока пакет был в пути, — заново к его запросам: версии записей кладутся по тем же
+   * правилам, что у события, состав `find` пакета пересчитывается, его счётчики и представления, чьи коллекции событие
+   * тронуло, устаревают.
+   */
+  private replay({ batch, revision, change }: ReplayParams) {
+    const keys = new Set(batch.queries.map(keyOf))
+    const events = this.journal.filter((event) => event.revision > revision)
+    const touched = new Set<string>()
+
+    events.sort((a, b) => a.revision - b.revision)
+
+    for (const event of events) {
+      for (const version of event.changes) {
+        this.applyVersion({ version, revision: event.revision, change, keys })
+        touched.add(version.collection)
+      }
+    }
+
+    for (const key of keys) {
+      const count = this.counts.get(key)
+      const view = this.views.get(key)
+
+      if (count && touched.has(count.query.collection) && !this.complete.has(count.query.collection)) {
+        this.markStale(key, count.query)
+      }
+
+      if (view && view.reads.some((collection) => touched.has(collection))) {
+        this.markStale(key, view.query)
+      }
+    }
+  }
+
+  /** Журнал нужен только пакетам в пути, и только события новее ревизии потока, с которой пакет ушёл. */
+  private trimJournal() {
+    if (this.batches.size === 0) {
+      this.journal = []
+      return
+    }
+
+    const oldest = Math.min(...[...this.batches].map((ticket) => ticket.revision))
+
+    this.journal = this.journal.filter((event) => event.revision > oldest)
+  }
+
+  /** Эпоха ответа: первая известная принимается, другая значит, что сервер перезапущен. */
+  private adoptEpoch(epoch: string) {
+    this.epoch ??= epoch
+
+    return this.epoch === epoch
   }
 
   /**
@@ -445,14 +571,17 @@ export class LiveStore {
     }
   }
 
-  private applyResult({ query, result, change }: ApplyResultParams) {
+  private applyResult({ query, result, change, revision }: ApplyResultParams) {
     const key = keyOf(query)
 
     if (query.kind === 'get' && 'ids' in result) {
       const missing = query.ids.filter((id) => !result.ids.includes(id))
       const unknown = missing.filter((id) => !this.isKnown(query.collection, id))
 
-      unknown.forEach((id) => this.put({ collection: query.collection, id, record: null }, change))
+      for (const id of unknown) {
+        this.put({ version: { collection: query.collection, id, record: null }, change, revision })
+      }
+
       return
     }
 
@@ -472,12 +601,12 @@ export class LiveStore {
       const { collection, where } = query
 
       if (where === null && query.limit === undefined) {
-        this.complete.add(collection)
+        this.complete.set(collection, revision)
         change.collections.add(collection)
       }
 
       if (where !== null || query.limit !== undefined) {
-        this.finds.set(key, { query, where: where ?? {}, ids: new Set(result.ids) })
+        this.finds.set(key, { query, where: where ?? {}, ids: new Set(result.ids), revision })
       }
 
       change.queries.add(key)
@@ -487,13 +616,15 @@ export class LiveStore {
   // events
 
   /**
-   * Событие из потока. Порядок задаёт только поток: события идут подряд, а первое задаёт эпоху и ревизию. Другая эпоха
-   * или разрыв ревизий значат, что события потеряны, — клиент забывает всё.
+   * Событие из потока. Порядок задаёт только поток: события идут подряд, а первое задаёт ревизию. Другая эпоха — потока
+   * или уже принятого ответа — или разрыв ревизий значат, что события потеряны, — клиент забывает всё.
    */
   push(event: DomainEvent) {
-    const isNext = event.epoch === this.epoch && event.revision === this.revision + 1
+    const isFirst = this.revision === 0
+    const isSameEpoch = this.epoch === null || event.epoch === this.epoch
+    const isNext = isFirst ? isSameEpoch : isSameEpoch && event.revision === this.revision + 1
 
-    if (this.epoch !== null && !isNext) {
+    if (!isNext) {
       this.resync('stream')
       return
     }
@@ -504,39 +635,60 @@ export class LiveStore {
   }
 
   /**
-   * Применение события. Новая версия записи кладётся, если запись у клиента есть или известно, что её нет, коллекция
-   * загружена целиком или её ждёт живой запрос. Живые `find` пересчитываются фильтром, окна — ещё и порядком; счётчики и
-   * представления тронутых коллекций перезапрашиваются с задержкой.
+   * Применение события: каждая версия — по правилам `applyVersion`; счётчики и представления тронутых коллекций
+   * перезапрашиваются с задержкой. Пока пакеты в пути, событие ложится в журнал: ответ, снятый раньше него, применит его
+   * к своим запросам заново.
    */
   private applyEvent(event: DomainEvent) {
     const change = emptyChange()
 
+    if (this.batches.size > 0) {
+      this.journal.push(event)
+    }
+
     for (const version of event.changes) {
-      const { collection, id, record } = version
-      const prev = this.records.get(collection)?.get(id) ?? null
-      const entries = [...this.finds].filter(([, entry]) => entry.query.collection === collection)
-      const isMatched = record !== null && entries.some(([, entry]) => matches(record, entry.where))
-
-      if (isMatched || this.isKnown(collection, id) || this.complete.has(collection)) {
-        this.put(version, change)
-      }
-
-      for (const [key, entry] of entries) {
-        const isMember = record !== null && matches(record, entry.where)
-        const isChanged =
-          entry.query.limit === undefined
-            ? this.applyMembership({ entry, id, isMember })
-            : this.applyWindow({ key, entry, id, isMember, prev })
-
-        if (isChanged) {
-          change.queries.add(key)
-        }
-      }
-
-      this.markCollectionStale(collection)
+      this.applyVersion({ version, revision: event.revision, change })
+      this.markCollectionStale(version.collection)
     }
 
     this.notify(change)
+  }
+
+  /**
+   * Версия записи из события кладётся, если клиент не знает версии новее, а запись у него есть или известно, что её нет,
+   * коллекция загружена целиком или её ждёт живой запрос — загруженные ответом раньше события. Состав живых `find` (при
+   * повторе после ответа — только запросов его пакета), которые событие ещё не учли, пересчитывается по той версии, что
+   * у клиента в итоге; окна — ещё и порядком.
+   */
+  private applyVersion({ version, revision, change, keys }: ApplyVersionParams) {
+    const { collection, id, record } = version
+    const finds = [...this.finds].filter(([, entry]) => {
+      return entry.query.collection === collection && entry.revision < revision
+    })
+    const prev = this.records.get(collection)?.get(id) ?? null
+    const loadedAt = this.complete.get(collection)
+    const isMatched = record !== null && finds.some(([, entry]) => matches(record, entry.where))
+    const isComplete = loadedAt !== undefined && loadedAt < revision
+    const isWanted = isMatched || this.isKnown(collection, id) || isComplete
+
+    if (isWanted && !this.isOutdated(version, revision)) {
+      this.put({ version, change, revision })
+    }
+
+    const current = this.records.get(collection)?.get(id) ?? null
+    const scoped = keys ? finds.filter(([key]) => keys.has(key)) : finds
+
+    for (const [key, entry] of scoped) {
+      const isMember = current !== null && matches(current, entry.where)
+      const isChanged =
+        entry.query.limit === undefined
+          ? this.applyMembership({ entry, id, isMember })
+          : this.applyWindow({ key, entry, id, isMember, prev: keys ? null : prev })
+
+      if (isChanged) {
+        change.queries.add(key)
+      }
+    }
   }
 
   /** Живой `find` без предела: запись входит в состав, если подходит под фильтр. Ответ — изменился ли состав. */
@@ -629,7 +781,10 @@ export class LiveStore {
     const change = emptyChange()
     const unknown = event.changes.filter((version) => !this.isKnown(version.collection, version.id))
 
-    unknown.forEach((version) => this.put(version, change))
+    for (const version of unknown) {
+      this.put({ version, change, revision: event.revision })
+    }
+
     this.notify(change)
 
     return event.result
@@ -686,6 +841,7 @@ export class LiveStore {
    */
   resync(reason: string) {
     this.records.clear()
+    this.revisions.clear()
     this.complete.clear()
     this.finds.clear()
     this.counts.clear()
@@ -693,6 +849,8 @@ export class LiveStore {
 
     this.failures = new Map()
     this.inflight = new Map()
+    this.batches = new Set()
+    this.journal = []
     this.generation += 1
 
     if (this.staleTimer) {
@@ -729,13 +887,24 @@ export class LiveStore {
     return this.records.get(collection)?.has(id) ?? false
   }
 
-  /** Версия записи на место прежней; какие поля изменились — для подписок. */
-  private put({ collection, id, record }: RecordVersion, change: ClientChange) {
+  /** Клиент знает версию записи новее: от события или ответа более поздней ревизии. */
+  private isOutdated({ collection, id }: RecordVersion, revision: number) {
+    const known = this.revisions.get(collection)?.get(id)
+
+    return known !== undefined && known > revision
+  }
+
+  /** Версия записи на место прежней с ревизией, которая её принесла; какие поля изменились — для подписок. */
+  private put({ version, change, revision }: PutParams) {
+    const { collection, id, record } = version
     const records = this.records.get(collection) ?? new Map<IType, object | null>()
+    const revisions = this.revisions.get(collection) ?? new Map<IType, number>()
     const prev = records.get(id) ?? null
 
     records.set(id, freezeInDev(record))
+    revisions.set(id, revision)
     this.records.set(collection, records)
+    this.revisions.set(collection, revisions)
     change.records.set(`${collection}:${id}`, prev && record && changedFields(prev, record))
 
     if (this.complete.has(collection)) {
@@ -823,6 +992,15 @@ const mergeGets = (queries: Query[]) => {
   })
 
   return [...merged, ...others]
+}
+
+/**
+ * Ревизия, которой помечается положенное ответом. Ответ учёл всё до своей ревизии `R` включительно и, может быть, часть
+ * следующей операции, поэтому он «после `R`»: событие `R`, пришедшее позже ответа, его не затирает, событие `R + 1` —
+ * затирает.
+ */
+const answeredAt = (revision: number) => {
+  return revision + 0.5
 }
 
 /** Попытка и повторы после пауз; последняя попытка бросает свою ошибку. */
