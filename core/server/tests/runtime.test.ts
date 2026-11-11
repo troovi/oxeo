@@ -168,6 +168,10 @@ describe('DomainRuntime', () => {
 
     expect(keys.sort()).toEqual(['author:1', 'author:2', 'note:1', 'note:2'])
 
+    // ответ несёт эпоху и последнюю ревизию до расчёта: всё до неё он учёл
+    expect(answer.epoch).toBe(runtime.epoch)
+    expect(answer.revision).toBe(runtime.revision)
+
     // отказ запроса — его результат, соседние запросы пакета отвечены
     const partial = await runtime.query({
       queries: [
@@ -180,6 +184,26 @@ describe('DomainRuntime', () => {
       { error: { code: 'notFound', message: expect.any(String) } },
       { count: 2 }
     ])
+  })
+})
+
+describe('ревизия ответа', () => {
+  it('пакет мимо очереди: ревизия ответа — последняя выданная до начала расчёта, не идущей операции', async () => {
+    const { runtime } = createRuntime()
+
+    await runtime.run({ domain: 'notes', method: 'addAuthor', params: { name: 'Аня' } }, null)
+
+    const before = runtime.revision
+    const running = runtime.run(
+      { domain: 'notes', method: 'add', params: { text: 'a', authorId: 1 } },
+      null
+    )
+    const answer = await runtime.query({ queries: [{ kind: 'find', collection: 'note', where: null }] })
+
+    await running
+
+    expect(answer.revision).toBe(before)
+    expect(runtime.revision).toBe(before + 1)
   })
 })
 

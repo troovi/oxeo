@@ -325,12 +325,12 @@ describe('пересинхронизация и пакеты в полёте', (
     await tick()
     expect(answers).toHaveLength(2)
 
-    answers[0]({ records: [note(1, 'старая')], results: [{ ids: [1] }] })
+    answers[0]({ epoch: 'e1', revision: 0, records: [note(1, 'старая')], results: [{ ids: [1] }] })
     await first
 
     expect(peek(client, (db) => db.note.all())).toBeUndefined()
 
-    answers[1]({ records: [note(1, 'новая')], results: [{ ids: [1] }] })
+    answers[1]({ epoch: 'e1', revision: 0, records: [note(1, 'новая')], results: [{ ids: [1] }] })
     await second
 
     expect(peek(client, (db) => db.note.get(1)?.text)).toBe('новая')
@@ -375,7 +375,7 @@ describe('пересинхронизация и пакеты в полёте', (
     refusals[1](new Error('упал'))
     await expect(second).rejects.toThrow('упал')
 
-    answers[0]({ records: [], results: [{ ids: [] }] })
+    answers[0]({ epoch: 'e1', revision: 0, records: [], results: [{ ids: [] }] })
     await first
 
     run()
@@ -389,12 +389,12 @@ describe('пересинхронизация и пакеты в полёте', (
 
     await tick()
     client.resync('тест')
-    answers[0]({ records: [note(1, 'старая')], results: [{ ids: [1] }] })
+    answers[0]({ epoch: 'e1', revision: 0, records: [note(1, 'старая')], results: [{ ids: [1] }] })
     await tick(5)
 
     expect(answers).toHaveLength(2)
 
-    answers[1]({ records: [note(1, 'новая')], results: [{ ids: [1] }] })
+    answers[1]({ epoch: 'e1', revision: 0, records: [note(1, 'новая')], results: [{ ids: [1] }] })
 
     const loaded = await loading
 
@@ -406,13 +406,13 @@ describe('пересинхронизация и пакеты в полёте', (
     const loaded = client.request([{ kind: 'count', collection: 'note', where: null }])
 
     await tick()
-    answers[0]({ records: [], results: [{ count: 1 }] })
+    answers[0]({ epoch: 'e1', revision: 0, records: [], results: [{ count: 1 }] })
     await loaded
 
     client.push(event(1, [note(1, 'a')]))
     await tick(5)
     client.resync('тест')
-    answers[1]({ records: [], results: [{ count: 2 }] })
+    answers[1]({ epoch: 'e1', revision: 0, records: [], results: [{ count: 2 }] })
     await tick()
 
     expect(peek(client, (db) => db.note.count())).toBeUndefined()
@@ -439,7 +439,12 @@ describe('поток и ответ вызова', () => {
     const pending = { answer: (_: DomainEvent) => {} }
     const client = createClient<Scheme, typeof domains>({
       transport: {
-        query: async () => ({ records: [note(1, 'a'), note(2, 'b')], results: [{ ids: [1, 2] }] }),
+        query: async () => ({
+          epoch: 'e1',
+          revision: 0,
+          records: [note(1, 'a'), note(2, 'b')],
+          results: [{ ids: [1, 2] }]
+        }),
         call: () => {
           return new Promise((resolve) => {
             pending.answer = resolve
@@ -826,7 +831,7 @@ describe('заморозка в разработке', () => {
             return query.kind === 'view' ? { value: { list: [1, 2] }, reads: [] } : { ids: [1] }
           })
 
-          return { records: [{ collection: 'note', id: 1, record }], results }
+          return { epoch: 'e1', revision: 0, records: [{ collection: 'note', id: 1, record }], results }
         },
         call: async () => {
           throw new Error('вызовов в этих тестах нет')
