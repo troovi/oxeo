@@ -77,6 +77,14 @@ export const createUseDb = <Db, Views>(client: BindingClient<Db, Views>) => {
     const needs = [...tracker.needs.values()]
     const failures = [...tracker.failures.keys()]
 
+    // след прохода действует с фиксации рендера: вызов, чей результат React выбросил, не отнимает у детей прежнего
+    // рендера поля, которые они читают через прокси своего прохода
+    useLayoutEffect(() => {
+      if (pass) {
+        tracker.commit(pass.trace)
+      }
+    })
+
     // новый монтаж запрашивает упавшее заново: иначе окно, открытое снова, осталось бы пустым до пересинхронизации
     useLayoutEffect(() => {
       if (failures.length > 0) {
