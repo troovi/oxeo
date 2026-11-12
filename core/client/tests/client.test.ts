@@ -88,13 +88,13 @@ describe('createClient', () => {
       })
     }
 
-    expect(run()).toEqual({ isComplete: false })
+    expect(run()).toMatchObject({ isComplete: false })
     expect(tracker.needs.size).toBe(3)
 
     await client.request([...tracker.needs.values()])
 
     expect(queries).toHaveLength(1)
-    expect(run()).toEqual({ isComplete: true, value: { name: 'Аня', texts: ['a'], drafts: 1 } })
+    expect(run()).toMatchObject({ isComplete: true, value: { name: 'Аня', texts: ['a'], drafts: 1 } })
     expect(tracker.needs.size).toBe(0)
     expect(tracker.records.get('author:1')).toEqual(new Set(['name']))
   })
@@ -229,6 +229,49 @@ describe('Tracker', () => {
     expect(tracker.isAffected(change({ everything: true }))).toBe(false)
   })
 
+  it('принятый след действует, пока не принят следующий: выброшенный проход не отнимает поля прокси', () => {
+    const { client } = connectClient(createRuntime())
+    const tracker = client.createTracker()
+    const record = { noteId: 1, text: 'a', status: 'draft' }
+
+    const change = (fields: string[]): ClientChange => ({
+      records: new Map([['note:1', fields]]),
+      queries: new Set(),
+      collections: new Set(),
+      everything: false
+    })
+
+    // проход читает заголовок, прокси уходит «ребёнку»; рендер зафиксирован
+    const first = tracker.run(() => tracker.track('note:1', record).status)
+    const proxy = tracker.track('note:1', record)
+
+    tracker.commit(first.trace)
+
+    // ребёнок читает поле после возврата колбэка
+    void proxy.text
+
+    // новый проход, чей результат выброшен: принятый след остаётся
+    tracker.run(() => tracker.track('note:1', record).status)
+
+    expect(tracker.isAffected(change(['text']))).toBe(true)
+    expect(tracker.isAffected(change(['noteId']))).toBe(false)
+
+    // без фиксаций сборщик сверяет только последний проход
+    const plain = client.createTracker()
+
+    plain.run(() => plain.track('note:1', record).status)
+    void plain.track('note:1', record).text
+    plain.run(() => plain.track('note:1', record).status)
+
+    expect(plain.isAffected(change(['text']))).toBe(false)
+
+    // после разового результата фиксация ничего не включает
+    tracker.release()
+    tracker.commit(first.trace)
+
+    expect(tracker.isAffected(change(['text']))).toBe(false)
+  })
+
   it('db живёт только в проходе: сохранённая ссылка закрыта', () => {
     const { client } = connectClient(createRuntime())
     const tracker = client.createTracker()
@@ -256,11 +299,11 @@ describe('Tracker', () => {
       })
     }
 
-    expect(run()).toEqual({ isComplete: false })
+    expect(run()).toMatchObject({ isComplete: false })
 
     await client.request([...tracker.needs.values()])
 
-    expect(run()).toEqual({ isComplete: true, value: 'АНЯ' })
+    expect(run()).toMatchObject({ isComplete: true, value: 'АНЯ' })
 
     expect(() => {
       tracker.run(() => {
@@ -607,14 +650,14 @@ describe('окна find и представления', () => {
 
     const run = () => tracker.run((_, views) => views.notes.summary({ authorId: 1 }))
 
-    expect(run()).toEqual({ isComplete: false })
+    expect(run()).toMatchObject({ isComplete: false })
     expect([...tracker.needs.values()]).toEqual([
       { kind: 'view', view: 'notes', method: 'summary', params: { authorId: 1 } }
     ])
 
     await client.request([...tracker.needs.values()])
 
-    expect(run()).toEqual({
+    expect(run()).toMatchObject({
       isComplete: true,
       value: { author: 'Аня', drafts: 2, published: 0, viewer: 'автор' }
     })
@@ -672,7 +715,7 @@ describe('отказ запроса', () => {
     await client.request([...tracker.needs.values()])
 
     expect(queries).toHaveLength(1)
-    expect(run()).toEqual({ isComplete: false })
+    expect(run()).toMatchObject({ isComplete: false })
     expect([...tracker.failures.keys()]).toEqual(['view:notes.crash:{}'])
     expect(tracker.needs.size).toBe(0)
 

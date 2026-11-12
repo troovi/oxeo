@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { Component, act, useRef, useState } from 'react'
+import { Component, StrictMode, act, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { describe, expect, it } from 'vitest'
 import type { Query, QueryBatch } from '@oxeo/scheme'
@@ -486,6 +486,114 @@ describe('useDb', () => {
     console.error = silent
 
     expect(broken.container.textContent).toBe('упало')
+  })
+})
+
+describe('useDb: учёт прочитанного принимается при фиксации рендера', () => {
+  /** Ребёнок читает поле записи, которую родитель получил своим `useDb` и отдал пропсом. */
+  const Title = ({ task, renders }: { task: Row; renders: { count: number } }) => {
+    renders.count += 1
+
+    return <i>{String(task.title)}</i>
+  }
+
+  it('отброшенный рендер родителя не теряет поля, прочитанные ребёнком', async () => {
+    const { useDb, tableOf, emit } = setup()
+    const parent = { count: 0 }
+    const child = { count: 0 }
+    const control = { set: (_: number) => {} }
+
+    tableOf('task').set(1, { id: 1, title: 'первое', note: 'заметка' })
+
+    const Card = () => {
+      const { data: task } = useDb((db) => db.task.get(1))
+      const [value, setValue] = useState(0)
+
+      control.set = setValue
+      parent.count += 1
+
+      if (!task) {
+        return null
+      }
+
+      return (
+        <b>
+          {`${String(task.note)} ${value} `}
+          <Title task={task} renders={child} />
+        </b>
+      )
+    }
+
+    const { container } = await mount(<Card />)
+
+    await settle()
+    expect(container.textContent).toBe('заметка 0 первое')
+
+    await act(async () => {
+      control.set(1)
+    })
+
+    // то же значение ещё раз: React вызывает компонент и отбрасывает результат, дети не перерисовываются
+    const before = { parent: parent.count, child: child.count }
+
+    await act(async () => {
+      control.set(1)
+    })
+
+    expect(parent.count).toBeGreaterThan(before.parent)
+    expect(child.count).toBe(before.child)
+
+    await act(async () => {
+      emit('task', { id: 1, title: 'второе', note: 'заметка' })
+    })
+    await settle()
+
+    expect(container.textContent).toBe('заметка 1 второе')
+  })
+
+  it('StrictMode: двойной вызов компонента и эффектов не теряет поля ребёнка', async () => {
+    const { useDb, tableOf, emit } = setup()
+    const child = { count: 0 }
+
+    tableOf('task').set(1, { id: 1, title: 'первое', note: 'заметка' })
+
+    const Card = () => {
+      const { data: task } = useDb((db) => db.task.get(1))
+
+      if (!task) {
+        return null
+      }
+
+      return (
+        <b>
+          {`${String(task.note)} `}
+          <Title task={task} renders={child} />
+        </b>
+      )
+    }
+
+    const { container } = await mount(
+      <StrictMode>
+        <Card />
+      </StrictMode>
+    )
+
+    await settle()
+    expect(container.textContent).toBe('заметка первое')
+
+    await act(async () => {
+      emit('task', { id: 1, title: 'второе', note: 'заметка' })
+    })
+    await settle()
+
+    expect(container.textContent).toBe('заметка второе')
+
+    await act(async () => {
+      emit('task', { id: 1, title: 'второе', note: 'другая' })
+    })
+    await settle()
+
+    expect(container.textContent).toBe('другая второе')
   })
 })
 
