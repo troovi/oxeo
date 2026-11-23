@@ -75,6 +75,19 @@ describe('доступ к операциям', () => {
     expect(accessRefusal({ ...check, method: 'list', roles: [] })).toBeNull()
   })
 
+  it('accessRefusal: суперроль проходит любой @Allow, но не @System', () => {
+    const check = { Class: StaffDomain, superRole: 'admin' }
+
+    expect(accessRefusal({ ...check, method: 'fire', roles: ['admin'] })).toBeNull()
+    expect(accessRefusal({ ...check, method: 'hire', roles: ['recruiter', 'admin'] })).toBeNull()
+    expect(accessRefusal({ ...check, method: 'fire', roles: ['recruiter'] })).toBe(
+      'Действие доступно только: director'
+    )
+    expect(accessRefusal({ ...check, method: 'report', roles: ['admin'] })).toBe(
+      'Отчёт строит только планировщик'
+    )
+  })
+
   it('индекс: открытые и разрешённые ролям операции, служебные отдельно, доступ операции', () => {
     const index = createAccessIndex(domains)
 
@@ -89,6 +102,19 @@ describe('доступ к операциям', () => {
     expect(index.system()).toEqual(['staff.report'])
     expect(index.of('staff', 'fire')).toEqual(['director'])
     expect(index.of('notes', 'publish')).toEqual(['editor'])
+  })
+
+  it('индекс с суперролью: ей — все операции, кроме служебных; другим ролям — как без неё', () => {
+    const index = createAccessIndex(domains, { superRole: 'admin' })
+
+    expect(index.allowed(['admin']).sort()).toEqual([
+      'notes.publish',
+      'staff.fire',
+      'staff.hire',
+      'staff.list'
+    ])
+    expect(index.allowed(['recruiter'])).toEqual(['staff.list', 'staff.hire'])
+    expect(index.system()).toEqual(['staff.report'])
   })
 
   it('описания: компилятор требует каждый домен и каждую операцию и не пускает лишнее', () => {

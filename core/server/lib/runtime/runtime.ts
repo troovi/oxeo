@@ -88,10 +88,15 @@ export interface QueryFailure {
   error: unknown
 }
 
-/** Доступ к операциям: роли актора для `@Allow` и подписи ролей в тексте отказа. */
+/** Доступ к операциям: роли актора для `@Allow`, суперроль и подписи ролей в тексте отказа. */
 export interface RuntimeAccess<Actor> {
   /** Роли актора; без опции `access` их нет — операции `@Allow` доступны только системе. */
   rolesOf: (actor: Actor) => RegisteredRole[]
+  /**
+   * Суперроль: актор с ней проходит любой `@Allow`, служебные операции `@System` ему закрыты. Индексу доступа её
+   * передают той же (`createAccessIndex(domains, { superRole })`).
+   */
+  superRole?: RegisteredRole
   /** Подпись роли в отказе «Действие доступно только: …»; по умолчанию — сама роль. */
   labelOf?: (role: RegisteredRole) => string
 }
@@ -383,13 +388,14 @@ export class DomainRuntime<T extends DomainsMap, C, Identity, Actor, V extends V
   }
 
   /**
-   * Доступ к операции по декоратору: `@Allow` — роли актора (`access.rolesOf`), система проходит; `@System` — только
-   * система. Отказ — `forbidden` до тела метода, без записей и ревизии.
+   * Доступ к операции по декоратору: `@Allow` — роли актора (`access.rolesOf`), суперроль и система проходят;
+   * `@System` — только система. Отказ — `forbidden` до тела метода, без записей и ревизии.
    */
   private assertAccess({ domain, method }: DomainCall, actor: Actor | null) {
     const { access, domains } = this.options
     const roles = actor === null ? null : (access?.rolesOf(actor) ?? [])
-    const refusal = accessRefusal({ Class: domains[domain], method, roles, labelOf: access?.labelOf })
+    const check = { Class: domains[domain], method, roles }
+    const refusal = accessRefusal({ ...check, superRole: access?.superRole, labelOf: access?.labelOf })
 
     if (refusal !== null) {
       throw new DomainError('forbidden', refusal)

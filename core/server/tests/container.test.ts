@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Allow, Collections, DomainsMap, Ids, Params, ViewsMap } from '@oxeo/scheme'
+import { Allow, Collections, DomainsMap, Ids, Params, System, ViewsMap } from '@oxeo/scheme'
 import { Domain, Service, View } from '@oxeo/scheme/di'
 import { z } from 'zod'
 import { Container, DomainRuntime, InjectionError, Token } from '../lib'
@@ -445,5 +445,42 @@ describe('доступ', () => {
       message: 'Действие доступно только: editor'
     })
     expect((await runtime.run(call, null)).result).toBe('ok')
+  })
+
+  it('суперроль проходит любой @Allow, служебная операция ей закрыта', async () => {
+    @Domain()
+    class GuardedDomain {
+      @Allow('editor')
+      @Params(z.object({}))
+      async edit(_params: {}) {
+        return 'ok'
+      }
+
+      @System('Сверку запускает только система')
+      @Params(z.object({}))
+      async reconcile(_params: {}) {
+        return 'сверено'
+      }
+    }
+
+    const runtime = new DomainRuntime({
+      domains: { guarded: GuardedDomain },
+      dataSource: source(),
+      counterCollection: 'counter',
+      resolveActor: (name: string) => ({ roles: name === 'админ' ? ['admin' as const] : [] }),
+      access: { rolesOf: (actor) => actor.roles, superRole: 'admin' },
+      today: () => '2026-01-01',
+      broadcast: () => {},
+      onPartialWrite: () => {}
+    })
+    const edit = { domain: 'guarded', method: 'edit', params: {} } as const
+    const reconcile = { domain: 'guarded', method: 'reconcile', params: {} } as const
+
+    expect((await runtime.run(edit, 'админ')).result).toBe('ok')
+    await expect(runtime.run(edit, 'автор')).rejects.toMatchObject({ code: 'forbidden' })
+    await expect(runtime.run(reconcile, 'админ')).rejects.toMatchObject({
+      code: 'forbidden',
+      message: 'Сверку запускает только система'
+    })
   })
 })

@@ -61,15 +61,17 @@ export interface AccessCheck {
   method: string
   /** Роли актора; `null` — вызывает система. */
   roles: RegisteredRole[] | null
+  /** Суперроль: актор с ней проходит любой `@Allow`, но не `@System`. */
+  superRole?: RegisteredRole
   /** Подпись роли в тексте отказа; по умолчанию — сама роль. */
   labelOf?: (role: RegisteredRole) => string
 }
 
 /**
  * Отказ доступа к методу — текст для `forbidden` или `null`, если доступ есть. Система проходит `@Allow`, актор —
- * если у него есть хотя бы одна из ролей; `@System` проходит только система.
+ * если у него есть хотя бы одна из ролей или суперроль; `@System` проходит только система.
  */
-export const accessRefusal = ({ Class, method, roles, labelOf }: AccessCheck) => {
+export const accessRefusal = ({ Class, method, roles, superRole, labelOf }: AccessCheck) => {
   const rule = ruleOf(Class.prototype, method)
 
   if (!rule) {
@@ -80,9 +82,14 @@ export const accessRefusal = ({ Class, method, roles, labelOf }: AccessCheck) =>
     return roles === null ? null : rule.message
   }
 
-  const allowed = rule.access
+  if (roles === null) {
+    return null
+  }
 
-  if (roles === null || allowed.some((role) => roles.includes(role))) {
+  const allowed = rule.access
+  const isSuper = superRole !== undefined && roles.includes(superRole)
+
+  if (isSuper || allowed.some((role) => roles.includes(role))) {
     return null
   }
 
@@ -91,13 +98,19 @@ export const accessRefusal = ({ Class, method, roles, labelOf }: AccessCheck) =>
   return `Действие доступно только: ${labels.join(', ')}`
 }
 
+export interface AccessIndexOptions {
+  /** Суперроль — та же, что у рантайма (`access.superRole`): ей доступны все операции, кроме служебных. */
+  superRole?: RegisteredRole
+}
+
 /**
  * Индекс доступа по реестру доменов — один обход: операция — метод со схемой `@Params`, каждая — в группу по своему
  * декоратору. Индекс не запрещает — запрет остаётся за рантаймом; по нему интерфейс решает, что показать, а сервер — что
  * закрыть для HTTP.
  */
-export const createAccessIndex = <T extends DomainsMap>(domains: T) => {
+export const createAccessIndex = <T extends DomainsMap>(domains: T, opts: AccessIndexOptions = {}) => {
   const open: OperationKey<T>[] = []
+  const guarded: OperationKey<T>[] = []
   const system: OperationKey<T>[] = []
   const byRole = new Map<RegisteredRole, OperationKey<T>[]>()
 
@@ -116,6 +129,8 @@ export const createAccessIndex = <T extends DomainsMap>(domains: T) => {
         continue
       }
 
+      guarded.push(operation)
+
       for (const role of access) {
         byRole.set(role, [...(byRole.get(role) ?? []), operation])
       }
@@ -123,8 +138,15 @@ export const createAccessIndex = <T extends DomainsMap>(domains: T) => {
   }
 
   return {
-    /** Операции, доступные ролям: открытые и разрешённые хотя бы одной роли; служебных нет. */
+    /**
+     * Операции, доступные ролям: открытые и разрешённые хотя бы одной роли, у суперроли — все операции `@Allow`;
+     * служебных нет.
+     */
     allowed: (roles: RegisteredRole[]) => {
+      if (opts.superRole !== undefined && roles.includes(opts.superRole)) {
+        return [...open, ...guarded]
+      }
+
       const operations = new Set(open)
 
       for (const role of roles) {

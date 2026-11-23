@@ -27,9 +27,13 @@ import { DataSource, DomainRuntime, PartialWrite, QueryFailure } from '../lib'
 
 export type Source = 'notes' | 'authors'
 
-export type Role = 'editor' | 'reader'
+export type Role = 'editor' | 'reader' | 'admin'
 
-export const ROLE_LABELS: Record<Role, string> = { editor: 'Редактор', reader: 'Читатель' }
+export const ROLE_LABELS: Record<Role, string> = {
+  editor: 'Редактор',
+  reader: 'Читатель',
+  admin: 'Администратор'
+}
 
 @Model({ name: 'Counter' })
 class CounterEntity {
