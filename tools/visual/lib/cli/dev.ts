@@ -126,6 +126,8 @@ const listen = async (server: http.Server, port: number) => {
 export const dev = async ({ configPath, port, open }: DevOptions) => {
   let html: string | null = null
   let svg: string | null = null
+  let operationsHtml: string | null = null
+  let name = 'scheme-map'
   let build: string | null = null
   let error: string | null = null
   let current: BuildRun | null = null
@@ -152,7 +154,12 @@ export const dev = async ({ configPath, port, open }: DevOptions) => {
       req.on('close', () => clients.delete(res))
       return
     }
-    if (url.pathname === '/' || url.pathname === '/index.html') {
+    if (url.pathname === `/${name}-operations.html` && operationsHtml) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
+      res.end(operationsHtml + devClient(build))
+      return
+    }
+    if (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === `/${name}.html`) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
       res.end(html ? html + devClient(build) : waitingPage())
       return
@@ -216,15 +223,17 @@ export const dev = async ({ configPath, port, open }: DevOptions) => {
     if (message.type === 'result') {
       html = message.html
       svg = message.svg
+      operationsHtml = message.operationsHtml
+      name = message.settings.output.name
       error = null
       build = String(started)
       log(describeBuild(message.metrics, Date.now() - started))
       broadcast('built', { build })
       watch(message.settings.watch)
     } else {
-      error = message.message
-      log(`сборка не удалась:\n${message.message}`)
-      broadcast('failed', { message: firstLine(message.message) })
+      error = message.type === 'error' ? message.message : 'неожиданный ответ сборки'
+      log(`сборка не удалась:\n${error}`)
+      broadcast('failed', { message: firstLine(error) })
     }
     if (queued) {
       queued = false

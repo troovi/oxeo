@@ -5,11 +5,12 @@
   "description": "Песочница oxeo: минимальный сервер NestJS и приложение Vite на uikit для набросков версий библиотеки",
   "scripts": {
     "dev": "node scripts/dev.js",
-    "server": "tsx watch server/main.ts",
+    "server": "node --watch --enable-source-maps -r ./scripts/register.js server/main.ts",
     "app": "vite --config app/vite.config.ts",
     "visual": "node scripts/visual.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "pinned": "npm install --prefix versions/v-0.4.1/pinned --legacy-peer-deps --no-workspaces --no-fund --no-audit"
+    "pinned": "npm install --prefix versions/v-0.4.1/pinned --legacy-peer-deps --no-workspaces --no-fund --no-audit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@companix/formkit": "latest",
@@ -39,6 +40,7 @@
     "sass": "^1.96.0",
     "tsx": "^4.19.2",
     "typescript": "^5.9.3",
-    "vite": "^7.0.0"
+    "vite": "^7.0.0",
+    "vitest": "^4.1.12"
   }
 }

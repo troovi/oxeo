@@ -50,7 +50,11 @@ type DiscriminatedExtension<C, I extends IType> =
     ? DiscriminatedApi<B, VU, DK, I>
     : unknown
 
-export type Collections<Scheme extends CollectionScheme> = {
+/**
+ * Коллекции схемы `Scheme` — общая форма, её держит `DataSource`. Домены берут токен `Collections` — коллекции схемы
+ * проекта.
+ */
+export type CollectionsOf<Scheme extends CollectionScheme> = {
   [K in keyof Scheme]: CollectionApi<ExtractType<Scheme[K]['model']>, Scheme[K]['identifierType']> &
     DiscriminatedExtension<Scheme[K], Scheme[K]['identifierType']>
 }

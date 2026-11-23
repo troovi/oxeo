@@ -1,38 +1,32 @@
 /**
  * Контракт представлений — чтений, которые исполняет сервер и отдаёт клиенту значением: агрегаты, сводки, выборки с
- * логикой, которую не выражает фильтр. Класс представлений получает только коллекции и не пишет; метод —
- * `(params, ctx)`, результат — значение (JSON). Параметры проверяет реестр схем, как у доменов.
+ * логикой, которую не выражает фильтр. Класс представлений получает коллекции только на чтение и не пишет; метод —
+ * `(params, ctx)`, результат — значение (JSON). Параметры проверяет схема `@Params`, как у доменов.
  */
-import type { DomainRoutes, DomainsParams } from '../domains'
+import type { DomainRoutes } from '../domains'
+import type { RegisteredActor } from '../register'
 
-/** Контекст расчёта: кто смотрит и какой сегодня день. Момента нет: значение кэшируется на день. */
-export interface ViewContext<Actor = unknown> {
+/**
+ * Контекст расчёта с актором `Actor` — общая форма для рантайма: кто смотрит и какой сегодня день. Момента нет:
+ * значение кэшируется на день.
+ */
+export interface ViewContextOf<Actor = unknown> {
   /** `null` — без идентичности (система, проверки). */
   readonly actor: Actor | null
   /** Дата `YYYY-MM-DD` в часовом поясе приложения — вычисляет сервер. */
   readonly today: string
 }
 
-/** Реестр представлений: ключ — имя в запросе, значение — класс с конструктором `(collections)`. */
+/** Контекст расчёта представления проекта: актор — `Register.actor`. */
+export interface ViewContext extends ViewContextOf<RegisteredActor> {}
+
+/**
+ * Реестр представлений: ключ — имя в запросе, значение — класс. Экземпляр собирает контейнер рантайма заново на каждый
+ * расчёт, коллекции в нём — только на чтение; класс реестра — с ролью `@View()` из `@oxeo/scheme/di`.
+ */
 export interface ViewsMap {
-  [view: string]: new (collections: any) => object
+  [view: string]: new (...args: any[]) => object
 }
 
 /** Методы представлений из сигнатур: метод → `{ params, answer }`. */
 export type ViewRoutes<T extends ViewsMap> = DomainRoutes<T>
-
-/** Схема на каждый публичный метод каждого класса представлений. */
-export type ViewsParams<T extends ViewsMap> = DomainsParams<T>
-
-/**
- * Реестр схем параметров представлений по типу реестра: компилятор не пропустит метод без схемы и схему не того типа.
- *
- * ```ts
- * export const appViewParams = createViewsParams<AppViews>({
- *   stats: { yearSummary: StatsViewParams.Year }
- * })
- * ```
- */
-export const createViewsParams = <T extends ViewsMap>(params: ViewsParams<T>) => {
-  return params
-}

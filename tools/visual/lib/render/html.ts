@@ -50,6 +50,7 @@ button { font: inherit; color: inherit; }
 .xv-seg button[aria-pressed='true'] { background: var(--xv-surface); color: var(--xv-text); box-shadow: 0 0 0 1px var(--xv-line), 0 1px 2px rgb(0 0 0 / 0.06); }
 .xv-tool { height: 32px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; font-size: 13px; font-weight: 500; cursor: pointer; }
 .xv-tool:hover { background: var(--xv-surface-2); }
+.xv-link { display: inline-flex; align-items: center; color: inherit; text-decoration: none; }
 .xv-tool[aria-expanded='true'] { background: var(--xv-accent-quiet); color: var(--xv-accent); }
 .xv-search { position: relative; display: flex; align-items: center; }
 .xv-search-icon { position: absolute; left: 10px; color: var(--xv-faint); pointer-events: none; }
@@ -142,9 +143,15 @@ export interface RenderPageOptions {
   mapSvg: string
   data: unknown
   meta: string
+  /** Ссылка на страницу «Операции», если она есть. */
+  opsHref?: string
 }
 
-export const renderPage = ({ zones, mapSvg, data, meta }: RenderPageOptions) => {
+export const renderPage = ({ zones, mapSvg, data, meta, opsHref }: RenderPageOptions) => {
+  const opsLink = opsHref
+    ? `<span class="xv-divider" aria-hidden="true"></span>
+      <a class="xv-tool xv-link" href="${opsHref}">Операции</a>`
+    : ''
   const json = JSON.stringify(data).replace(/</g, '\\u003c')
   return `<!doctype html>
 <meta charset="utf-8" />
@@ -176,6 +183,7 @@ ${mapSvg}
       </div>
       <span class="xv-divider" aria-hidden="true"></span>
       <button type="button" class="xv-tool" id="xv-legend-toggle" aria-controls="xv-legend" aria-expanded="false">Легенда</button>
+      ${opsLink}
     </div>
     <div class="xv-zoom" id="xv-zoom"></div>
     <aside class="xv-legend" id="xv-legend" aria-label="Легенда" hidden></aside>

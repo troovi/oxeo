@@ -4,6 +4,9 @@
 `DataScheme` и исходников схемы. Подсказки показывают JSDoc, декораторы и типы TS, у json-полей — интерфейс значения.
 Проект задаёт только каркас карты: зоны, пояса, порядок файлов и цвета.
 
+Рядом с картой — страница «Операции»: домены реестра, их операции, описания, доступ и схема параметров. Та же модель
+даёт таблицу операций для README.
+
 ## Подключение
 
 ```json
@@ -14,7 +17,8 @@
   },
   "scripts": {
     "scheme:map": "oxeo-visual dev",
-    "scheme:map:build": "oxeo-visual build"
+    "scheme:map:build": "oxeo-visual build",
+    "ops:map": "oxeo-visual ops-map"
   }
 }
 ```
@@ -68,14 +72,46 @@ export default defineConfig({
 | `watch`          | дополнительные пути для `dev`; папка конфига отслеживается всегда           |
 | `output`         | куда `build` пишет `<name>.html` и `<name>.svg`                             |
 | `spacing`        | отступы раскладки, см. `DEFAULT_SPACING`                                    |
+| `operations`     | страница «Операции» и таблица README, см. ниже                              |
 
 Описание модели — JSDoc `/** … */` над её классом, описание поля — JSDoc над свойством.
+
+## Операции
+
+```ts
+export default defineConfig({
+  …,
+  operations: {
+    domains: appDomains,
+    descriptions: appDomainsDescriptions,
+    labelOf: (role) => POSITIONS[role].short,
+    readme: './domains/README.md'
+  }
+})
+```
+
+| Поле           | Назначение                                                                       |
+| -------------- | -------------------------------------------------------------------------------- |
+| `domains`      | реестр доменов: операции — методы со схемой `@Params`                            |
+| `descriptions` | описания доменов и операций — `DomainsDescriptions` из `@oxeo/scheme`            |
+| `labelOf`      | подпись роли `@Allow` в колонке «Кто»; по умолчанию — сама роль                  |
+| `readme`       | файл, куда `ops-map` пишет таблицу; путь от папки конфига, `--readme` его заменяет |
+
+Доступ берётся из декораторов `@Allow` и `@System`: роли подписями, «система» или «любой». Схема параметров — тип
+TypeScript из JSON Schema, которую даёт `zod` проекта. `@oxeo/scheme` (0.6 и новее) и `zod` пакет берёт из проекта, от
+папки конфига: реестры `@Params` и доступа живут в его экземпляре пакета.
+
+`build` пишет страницу рядом с картой — `<name>-operations.html`, `dev` отдаёт её по тому же адресу, панель карты
+ведёт на неё ссылкой «Операции». `ops-map` переписывает блок README между `<!-- ops:map:start -->` и
+`<!-- ops:map:end -->` — строку «Доменов — N, операций — M, из них служебных — K» и таблицу с колонками «Домен»,
+«Операция», «Действие» и «Кто»; текст вокруг маркеров не трогает. Схема данных `ops-map` не нужна.
 
 ## Команды
 
 ```
-oxeo-visual dev    [--config <файл>] [--port <номер>] [--no-open]
-oxeo-visual build  [--config <файл>] [--out <папка>]
+oxeo-visual dev      [--config <файл>] [--port <номер>] [--no-open]
+oxeo-visual build    [--config <файл>] [--out <папка>]
+oxeo-visual ops-map  [--config <файл>] [--readme <файл>]
 ```
 
 `dev` поднимает сервер на `127.0.0.1:4870` (если порт занят — следующий свободный) и открывает карту в браузере.
@@ -92,9 +128,12 @@ oxeo-visual build  [--config <файл>] [--out <папка>]
 ## API
 
 ```ts
-import { buildSchemeMap, extractScheme } from '@oxeo/visual'
+import { buildSchemeMap, extractOperations, opsMapBlock, renderOperationsPage } from '@oxeo/visual'
 
-const { html, svg, metrics } = await buildSchemeMap(dataScheme, { sourceDir, tsconfig, config })
+const { html, svg, metrics } = await buildSchemeMap(dataScheme, { sourceDir, tsconfig, config, opsHref })
+const operations = extractOperations(config.operations, configPath)
+const page = renderOperationsPage({ model: operations, mapHref: './scheme-map.html' })
+const block = opsMapBlock(operations)
 ```
 
 Маршрутизация связей — [libavoid-js](https://github.com/Aksem/libavoid-js) (LGPL-2.1).

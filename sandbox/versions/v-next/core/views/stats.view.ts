@@ -1,7 +1,9 @@
-import type { Collections, ViewContext } from '../../lib/scheme'
-import type { Actor } from '../domains'
+import type { z } from 'zod'
+import { Collections, Params } from '../../lib/scheme'
+import type { ViewContext } from '../../lib/scheme'
+import { View } from '../../lib/di'
 import type { AppKey } from '../keys'
-import type { AppScheme } from '../scheme'
+import { StatsViewParams } from './stats.params'
 
 /** Смены по стадиям: число и план ревизоров. */
 export type StageSummary = Record<AppKey.ShiftStage, { shifts: number; plan: number }>
@@ -10,11 +12,13 @@ export type StageSummary = Record<AppKey.ShiftStage, { shifts: number; plan: num
  * Сводки, которые считает сервер: клиент получает значение, а не записи. Пересчёт — когда событие тронет прочитанные
  * коллекции.
  */
-export class StatsViews {
-  constructor(private collections: Collections<AppScheme>) {}
+@View()
+export class StatsView {
+  constructor(private collections: Collections) {}
 
   /** Смены по стадиям с планом ревизоров; `from` — смены с этой даты, без неё — все. */
-  async shiftStages(params: { from: string | null }, _ctx: ViewContext<Actor>) {
+  @Params(StatsViewParams.ShiftStages)
+  async shiftStages(params: z.infer<typeof StatsViewParams.ShiftStages>, _ctx: ViewContext) {
     const shifts = await this.collections.shift.findBy(
       params.from ? { date: { gte: params.from } } : {}
     )

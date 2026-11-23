@@ -1,7 +1,8 @@
 import { z } from 'zod'
-import { Collections } from '../../../lib/scheme'
-import { DomainContext, DomainIds, invariant, notFound } from '../context'
-import { AppScheme, WorkerEntities } from '../../scheme'
+import { Collections, DomainContext, Ids, Params, existing } from '../../../lib/scheme'
+import { Domain } from '../../../lib/di'
+import { invariant } from '../context'
+import { WorkerEntities } from '../../scheme'
 import { DictionaryDomain } from '../dictionary/dictionary.domain'
 import { WorkersParams } from './workers.params'
 
@@ -11,10 +12,11 @@ interface DictionaryFields {
   citizenshipId: string | null
 }
 
+@Domain()
 export class WorkersDomain {
   constructor(
-    private collections: Collections<AppScheme>,
-    private ids: DomainIds
+    private collections: Collections,
+    private ids: Ids
   ) {}
 
   // ------------------------------------------- operations --------------------------------------------
@@ -23,6 +25,7 @@ export class WorkersDomain {
    * Офисный сотрудник: номер из счётчика, статус `working`, момент создания — `ctx.at`; регионы и
    * гражданство — значения своих справочников. Возвращает `workerId`.
    */
+  @Params(WorkersParams.CreateOffice)
   async createOffice(params: z.infer<typeof WorkersParams.CreateOffice>, ctx: DomainContext) {
     await this.expectDictionaries(params)
 
@@ -47,6 +50,7 @@ export class WorkersDomain {
    * Ревизор с категорией; номер — из того же счётчика, что у офисных, справочники — как у офисного.
    * Возвращает `workerId`.
    */
+  @Params(WorkersParams.CreateRevisor)
   async createRevisor(params: z.infer<typeof WorkersParams.CreateRevisor>, ctx: DomainContext) {
     await this.expectDictionaries(params)
 
@@ -68,6 +72,7 @@ export class WorkersDomain {
   }
 
   /** Переименование — точечный патч одного поля. */
+  @Params(WorkersParams.Rename)
   async rename({ workerId, name }: z.infer<typeof WorkersParams.Rename>) {
     await this.getWorker(workerId)
 
@@ -77,6 +82,7 @@ export class WorkersDomain {
   }
 
   /** Увольнение: статус `fired`; уволенный повторно не увольняется и не может быть актором. */
+  @Params(WorkersParams.Fire)
   async fire({ workerId }: z.infer<typeof WorkersParams.Fire>) {
     const worker = await this.getWorker(workerId)
 
@@ -97,14 +103,8 @@ export class WorkersDomain {
   }
 
   /** Сотрудник или отказ `notFound` — для других доменов. */
-  static async loadWorker(collections: Collections<AppScheme>, workerId: number) {
-    const worker = await collections.worker.get(workerId)
-
-    if (!worker) {
-      throw notFound(`сотрудник ${workerId}`)
-    }
-
-    return worker
+  static loadWorker(collections: Collections, workerId: number) {
+    return existing(collections.worker.get(workerId), `сотрудник ${workerId}`)
   }
 
   // --------------------------------------------- private ---------------------------------------------

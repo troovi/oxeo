@@ -1,6 +1,6 @@
 {
   "name": "@oxeo/client",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Клиент oxeo: живая часть базы сервера, чтения, пакеты запросов, очередь событий и вызовы операций",
   "repository": {
     "type": "git",
@@ -36,6 +36,6 @@
     "eslint-plugin-react-hooks": "^4.6.2",
     "rollup": "^4.18.1",
     "rollup-plugin-auto-external": "^2.0.0",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.12"
   }
 }

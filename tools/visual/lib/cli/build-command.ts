@@ -13,8 +13,8 @@ export interface BuildOptions {
 export const buildOnce = async ({ configPath, out }: BuildOptions) => {
   const started = Date.now()
   const message = await startBuild(configPath).done
-  if (message.type === 'error') {
-    log(`сборка не удалась:\n${message.message}`)
+  if (message.type !== 'result') {
+    log(`сборка не удалась:\n${message.type === 'error' ? message.message : message.type}`)
     process.exitCode = 1
     return
   }
@@ -23,6 +23,11 @@ export const buildOnce = async ({ configPath, out }: BuildOptions) => {
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(`${base}.html`, message.html)
   fs.writeFileSync(`${base}.svg`, message.svg)
+  const written = [`${base}.html`, `${base}.svg`]
+  if (message.operationsHtml) {
+    fs.writeFileSync(`${base}-operations.html`, message.operationsHtml)
+    written.push(`${base}-operations.html`)
+  }
   log(describeBuild(message.metrics, Date.now() - started))
-  log(`${path.relative(process.cwd(), `${base}.html`)}, ${path.relative(process.cwd(), `${base}.svg`)}`)
+  log(written.map((file) => path.relative(process.cwd(), file)).join(', '))
 }

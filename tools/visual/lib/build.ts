@@ -20,6 +20,8 @@ export interface SchemeMapOptions {
   /** tsconfig проекта для разрешения типов json-полей. */
   tsconfig?: string
   config: VisualConfig
+  /** Ссылка на страницу «Операции» в панели карты. */
+  opsHref?: string
 }
 
 export interface SchemeMapResult {
@@ -38,7 +40,7 @@ export interface SchemeMapResult {
 
 export const buildSchemeMap = async (
   dataScheme: SchemeSource,
-  { sourceDir, tsconfig, config }: SchemeMapOptions
+  { sourceDir, tsconfig, config, opsHref }: SchemeMapOptions
 ): Promise<SchemeMapResult> => {
   const model = extractScheme(dataScheme, { sourceDir, tsconfig })
   const spacing = resolveSpacing(config)
@@ -85,7 +87,7 @@ export const buildSchemeMap = async (
   )} · ${plural(model.files.length, ['файл', 'файла', 'файлов'])}`
 
   return {
-    html: renderPage({ zones, mapSvg: renderMapSvg(renderOptions), data, meta }),
+    html: renderPage({ zones, mapSvg: renderMapSvg(renderOptions), data, meta, opsHref }),
     svg: renderMapSvg({ ...renderOptions, standalone: true }),
     model,
     metrics: {

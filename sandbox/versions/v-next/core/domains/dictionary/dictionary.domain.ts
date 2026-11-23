@@ -1,8 +1,9 @@
 import { z } from 'zod'
-import { Collections } from '../../../lib/scheme'
+import { Collections, Ids, Params, System, notFound } from '../../../lib/scheme'
+import { Domain } from '../../../lib/di'
 import { AppKey, AppKeys } from '../../keys'
-import { AppScheme, DictionaryEntities } from '../../scheme'
-import { DomainContext, DomainIds, invariant, notFound } from '../context'
+import { DictionaryEntities } from '../../scheme'
+import { invariant } from '../context'
 import { DictionaryParams } from './dictionary.params'
 
 interface OptionsCheck {
@@ -21,23 +22,19 @@ const DICTIONARY_NAMES: Record<AppKey.Dictionary, string> = {
  * значение удаляется, а не архивируется: схема сама снимает его с записей — из набора ссылка уходит,
  * одиночная ссылка становится `null`. Названия значений словаря уникальны без учёта регистра.
  */
+@Domain()
 export class DictionaryDomain {
   constructor(
-    private collections: Collections<AppScheme>,
-    private ids: DomainIds
+    private collections: Collections,
+    private ids: Ids
   ) {}
 
   // ------------------------------------------- operations --------------------------------------------
 
   /** Посев: идемпотентно заводит словари перечня `AppKeys.Dictionary`. Только система. */
-  async ensureDictionaries(
-    _params: z.infer<typeof DictionaryParams.EnsureDictionaries>,
-    ctx: DomainContext
-  ) {
-    if (ctx.actor !== null) {
-      throw invariant('Справочники заводит система')
-    }
-
+  @System('Справочники заводит система')
+  @Params(DictionaryParams.EnsureDictionaries)
+  async ensureDictionaries(_params: z.infer<typeof DictionaryParams.EnsureDictionaries>) {
     for (const dictionary of AppKeys.Dictionary) {
       const isExisting = await this.collections.dictionary.exists(dictionary)
 
@@ -52,6 +49,7 @@ export class DictionaryDomain {
   }
 
   /** Новое значение словаря; название уникально в словаре. Возвращает сгенерированный `value`. */
+  @Params(DictionaryParams.AddOption)
   async addOption(params: z.infer<typeof DictionaryParams.AddOption>) {
     const options = await this.collections.option.findBy({ dictionary: params.dictionary })
 
@@ -71,6 +69,7 @@ export class DictionaryDomain {
   }
 
   /** Новое название значения; уникально в его словаре. */
+  @Params(DictionaryParams.RenameOption)
   async renameOption({ value, title }: z.infer<typeof DictionaryParams.RenameOption>) {
     const option = await this.getOption(value)
     const options = await this.collections.option.findBy({ dictionary: option.dictionary })
@@ -86,6 +85,7 @@ export class DictionaryDomain {
   }
 
   /** Удаление значения: схема снимает его с записей, которые на него ссылаются. */
+  @Params(DictionaryParams.RemoveOption)
   async removeOption({ value }: z.infer<typeof DictionaryParams.RemoveOption>) {
     await this.getOption(value)
     await this.collections.option.remove(value)
@@ -94,7 +94,7 @@ export class DictionaryDomain {
   // --------------------------------------------- helpers ---------------------------------------------
 
   /** Значения `values` принадлежат словарю `dictionary`, иначе отказ — для доменов, которые ссылаются на них. */
-  static async expectOptions(collections: Collections<AppScheme>, check: OptionsCheck) {
+  static async expectOptions(collections: Collections, check: OptionsCheck) {
     const { dictionary, values } = check
 
     for (const value of values) {

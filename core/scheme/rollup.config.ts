@@ -10,13 +10,15 @@ const plugins = () => {
     autoExternal(),
     resolve(),
     strip(),
-    terser()
+    // имена классов нужны текстам ошибок контейнера: «Ids нет в представлении»
+    terser({ keep_classnames: true })
   ]
 }
 
 /**
- * Два входа, у каждого ESM — для сборщиков — и CommonJS — для node. Главный вход — схема, домены и `schemaOf` с zod: его
+ * Три входа, у каждого ESM — для сборщиков — и CommonJS — для node. Главный вход — схема, домены и `schemaOf` с zod: его
  * исполняет сервер. Вход `filter` — язык фильтра без декораторов и zod: его берёт в рантайме клиент (`filter/package.json`).
+ * Вход `di` — роли классов с полифилом `reflect-metadata`: только серверу (`di/package.json`).
  */
 export default [
   {
@@ -37,6 +39,16 @@ export default [
   {
     input: './lib/filter/index.ts',
     output: { file: 'dist/filter.cjs.js', format: 'cjs' },
+    plugins: plugins()
+  },
+  {
+    input: './lib/di/index.ts',
+    output: { file: 'dist/di.esm.js', format: 'esm' },
+    plugins: plugins()
+  },
+  {
+    input: './lib/di/index.ts',
+    output: { file: 'dist/di.cjs.js', format: 'cjs' },
     plugins: plugins()
   }
 ]

@@ -1,7 +1,8 @@
 import { z } from 'zod'
-import { Collections, sortById } from '../../../lib/scheme'
-import { DomainContext, DomainIds, invariant, notFound } from '../context'
-import { AppScheme, ShiftEntities } from '../../scheme'
+import { Collections, DomainContext, Ids, Params, notFound, sortById } from '../../../lib/scheme'
+import { Domain } from '../../../lib/di'
+import { invariant } from '../context'
+import { ShiftEntities } from '../../scheme'
 import { ProjectsDomain } from '../projects/projects.domain'
 import { WorkersDomain } from '../workers/workers.domain'
 import { ShiftsParams } from './shifts.params'
@@ -9,10 +10,11 @@ import { ShiftsParams } from './shifts.params'
 /** Ставка менеджера смены — к ставке ревизора. */
 const MANAGER_RATE_FACTOR = 1.5
 
+@Domain()
 export class ShiftsDomain {
   constructor(
-    private collections: Collections<AppScheme>,
-    private ids: DomainIds
+    private collections: Collections,
+    private ids: Ids
   ) {}
 
   // ------------------------------------------- operations --------------------------------------------
@@ -21,6 +23,7 @@ export class ShiftsDomain {
    * Смена активного проекта в стадии `created`, состав пуст (так требует `HasMany`). Возвращает
    * `shiftId`.
    */
+  @Params(ShiftsParams.Create)
   async create(params: z.infer<typeof ShiftsParams.Create>, ctx: DomainContext) {
     const project = await ProjectsDomain.loadProject(this.collections, params.projectId)
 
@@ -48,6 +51,7 @@ export class ShiftsDomain {
   }
 
   /** Запуск набора: `created → recruiting`, ставка должна быть задана. */
+  @Params(ShiftsParams.LaunchRecruiting)
   async launchRecruiting({ shiftId }: z.infer<typeof ShiftsParams.LaunchRecruiting>) {
     const shift = await this.getShift(shiftId)
 
@@ -68,6 +72,7 @@ export class ShiftsDomain {
    * Участник смены в наборе: работающий сотрудник, не состоящий в этой смене. Запись `participant` с
    * `BelongsTo` сама попадает в `shift.participantIds`. Возвращает `participantId`.
    */
+  @Params(ShiftsParams.AddParticipant)
   async addParticipant(params: z.infer<typeof ShiftsParams.AddParticipant>, ctx: DomainContext) {
     const shift = await this.getShift(params.shiftId)
 
@@ -106,6 +111,7 @@ export class ShiftsDomain {
   }
 
   /** Снятие участника до завершения смены: запись удаляется, ссылка из `participantIds` уходит сама. */
+  @Params(ShiftsParams.Withdraw)
   async withdraw({ participantId }: z.infer<typeof ShiftsParams.Withdraw>) {
     const participant = await this.getParticipant(participantId)
     const shift = await this.getShift(participant.shiftId)
@@ -118,6 +124,7 @@ export class ShiftsDomain {
   }
 
   /** Явка участника — у смены в наборе; завершение требует явку у всех. */
+  @Params(ShiftsParams.SetAttendance)
   async setAttendance({ participantId, attendance }: z.infer<typeof ShiftsParams.SetAttendance>) {
     const participant = await this.getParticipant(participantId)
     const shift = await this.getShift(participant.shiftId)
@@ -135,6 +142,7 @@ export class ShiftsDomain {
    * Завершение: у всех участников отмечена явка; каждому начисляется ставка (отсутствующему — 0), итоги
    * — в `stats`, стадия пишется последней отдельной записью.
    */
+  @Params(ShiftsParams.Complete)
   async complete({ shiftId }: z.infer<typeof ShiftsParams.Complete>, ctx: DomainContext) {
     const shift = await this.getShift(shiftId)
 
@@ -174,6 +182,7 @@ export class ShiftsDomain {
   }
 
   /** Отмена с причиной — до завершения. */
+  @Params(ShiftsParams.Cancel)
   async cancel({ shiftId, reason }: z.infer<typeof ShiftsParams.Cancel>) {
     const shift = await this.getShift(shiftId)
 

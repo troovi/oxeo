@@ -12,8 +12,8 @@ export * from './shifts/shifts.domain'
 export * from './workers/workers.domain'
 
 /**
- * Реестр доменов: ключ — имя в маршруте `domains/<key>/<method>`. Схемы параметров — `params.ts`,
- * только серверу.
+ * Реестр доменов: ключ — имя в маршруте `domains/<key>/<method>`. Схемы параметров — `@Params` на
+ * операциях; экземпляры собирает контейнер рантайма.
  */
 export const appDomains = {
   dictionary: DictionaryDomain,

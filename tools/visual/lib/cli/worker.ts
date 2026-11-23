@@ -6,7 +6,9 @@
 import * as path from 'path'
 import * as ts from 'typescript'
 import { buildSchemeMap, type SchemeMapResult } from '../build'
+import { extractOperations, type OperationsModel } from '../operations'
 import type { OxeoVisualConfig } from '../project'
+import { renderOperationsPage } from '../render/operations'
 
 export interface BuildSettings {
   configDir: string
@@ -21,10 +23,16 @@ export type WorkerMessage =
       type: 'result'
       html: string
       svg: string
+      /** Страница «Операции» — если в конфиге есть `operations`. */
+      operationsHtml: string | null
       metrics: SchemeMapResult['metrics']
       settings: BuildSettings
     }
+  | { type: 'operations'; model: OperationsModel; readme: string | null }
   | { type: 'error'; message: string }
+
+/** Что собирает процесс: карту со страницей операций или только операции для таблицы README. */
+export type BuildMode = 'map' | 'ops'
 
 const isTypeScript = (file: string) => /\.(c|m)?ts$/.test(file)
 
@@ -46,44 +54,66 @@ const registerTypeScript = (configPath: string) => {
   })
 }
 
-const run = async (configPath: string): Promise<WorkerMessage> => {
+const run = async (configPath: string, mode: BuildMode): Promise<WorkerMessage> => {
   if (isTypeScript(configPath)) registerTypeScript(configPath)
   const loaded = require(configPath)
   const config: OxeoVisualConfig | undefined = loaded?.default ?? loaded
-  if (!config?.scheme) {
+  if (!config) {
+    throw new Error(`${path.basename(configPath)}: экспортируйте defineConfig({ scheme, ... })`)
+  }
+
+  const dir = path.dirname(configPath)
+  const resolve = (p: string) => path.resolve(dir, p)
+  const name = config.output?.name ?? 'scheme-map'
+  const operations = config.operations ? extractOperations(config.operations, configPath) : null
+
+  if (mode === 'ops') {
+    if (!operations) {
+      throw new Error(`${path.basename(configPath)}: не заданы operations — реестр доменов и описания`)
+    }
+    const readme = config.operations?.readme ? resolve(config.operations.readme) : null
+    return { type: 'operations', model: operations, readme }
+  }
+
+  if (!config.scheme) {
     throw new Error(
       `${path.basename(configPath)}: не задана схема — экспортируйте defineConfig({ scheme, ... })`
     )
   }
 
-  const dir = path.dirname(configPath)
-  const resolve = (p: string) => path.resolve(dir, p)
   const sourceDir = resolve(config.sourceDir)
   const tsconfig = config.tsconfig
     ? resolve(config.tsconfig)
     : ts.findConfigFile(dir, ts.sys.fileExists)
-  const result = await buildSchemeMap(config.scheme, { sourceDir, tsconfig, config })
+
+  const opsHref = operations ? `./${name}-operations.html` : undefined
+  const result = await buildSchemeMap(config.scheme, { sourceDir, tsconfig, config, opsHref })
+  const operationsHtml = operations
+    ? renderOperationsPage({ model: operations, mapHref: `./${name}.html` })
+    : null
 
   return {
     type: 'result',
     html: result.html,
     svg: result.svg,
+    operationsHtml,
     metrics: result.metrics,
     settings: {
       configDir: dir,
       sourceDir,
       watch: [...new Set([dir, sourceDir, ...(config.watch ?? []).map(resolve)])],
-      output: { dir: resolve(config.output?.dir ?? '.'), name: config.output?.name ?? 'scheme-map' }
+      output: { dir: resolve(config.output?.dir ?? '.'), name }
     }
   }
 }
 
 const send = (message: WorkerMessage) => {
-  if (process.send) process.send(message, () => process.exit(message.type === 'result' ? 0 : 1))
-  else process.exit(message.type === 'result' ? 0 : 1)
+  const code = message.type === 'error' ? 1 : 0
+  if (process.send) process.send(message, () => process.exit(code))
+  else process.exit(code)
 }
 
-run(path.resolve(process.argv[2]))
+run(path.resolve(process.argv[2]), process.argv[3] === 'ops' ? 'ops' : 'map')
   .then(send)
   .catch((error: unknown) =>
     send({

@@ -1,28 +1,14 @@
 /**
- * Контекст вызова домена песочницы: актор — сотрудник (или `null` — система). Источники нумерации —
- * счётчики `counter`, выдача идентификаторов — библиотека.
+ * Актор песочницы и её отказы. Контекст вызова, токены окружения, `notFound` и `existing` — из библиотеки, типы проекта
+ * для них — `core/register.ts`.
  */
-import { DomainContext as OxeoDomainContext, DomainError, IdSource } from '../../lib/scheme'
-import { AppKey } from '../keys'
+import { DomainError } from '../../lib/scheme'
 
 export interface Actor {
   workerId: number
 }
 
-export type DomainContext = OxeoDomainContext<Actor>
-
-/** Выдача идентификаторов — окружение домена. */
-export type DomainIds = IdSource<AppKey.CounterSource>
-
-export type DomainErrorCode = 'notFound' | 'invariant'
-
-/** Ошибка бизнес-правила. */
-export class AppDomainError extends DomainError<DomainErrorCode> {}
-
-export const notFound = (what: string) => {
-  return new AppDomainError('notFound', `Не найдено: ${what}`)
-}
-
+/** Отказ бизнес-правила: вход противоречит правилу — код `invariant`. */
 export const invariant = (message: string) => {
-  return new AppDomainError('invariant', message)
+  return new DomainError('invariant', message)
 }

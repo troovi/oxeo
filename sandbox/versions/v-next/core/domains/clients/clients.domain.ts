@@ -1,19 +1,21 @@
 import { z } from 'zod'
-import { Collections } from '../../../lib/scheme'
-import { DomainContext, DomainIds, invariant, notFound } from '../context'
-import { AppScheme } from '../../scheme'
+import { Collections, DomainContext, Ids, Params, notFound } from '../../../lib/scheme'
+import { Domain } from '../../../lib/di'
+import { invariant } from '../context'
 import { ClientsParams } from './clients.params'
 import { WorkersDomain } from '../workers/workers.domain'
 
+@Domain()
 export class ClientsDomain {
   constructor(
-    private collections: Collections<AppScheme>,
-    private ids: DomainIds
+    private collections: Collections,
+    private ids: Ids
   ) {}
 
   // ------------------------------------------- operations --------------------------------------------
 
   /** Клиент с менеджером — работающим офисным сотрудником. Возвращает `clientId`. */
+  @Params(ClientsParams.Create)
   async create(params: z.infer<typeof ClientsParams.Create>, ctx: DomainContext) {
     const manager = await WorkersDomain.loadWorker(this.collections, params.managerId)
 
@@ -38,6 +40,7 @@ export class ClientsDomain {
    * схема — ссылка `project.clientId` объявлена `restrict`, и oxeo ответит ошибкой целостности
    * `DEPENDENCY_RESTRICT`.
    */
+  @Params(ClientsParams.Remove)
   async remove({ clientId }: z.infer<typeof ClientsParams.Remove>) {
     const client = await this.collections.client.get(clientId)
 

@@ -1,4 +1,4 @@
-import { CollectionApi, CollectionScheme, Collections, DataScheme, IType } from '@oxeo/scheme'
+import { CollectionApi, CollectionScheme, CollectionsOf, DataScheme, IType } from '@oxeo/scheme'
 import { xRay } from '../utils/x-ray'
 import { __DEV__ } from '../utils'
 
@@ -17,7 +17,7 @@ interface DataSourceOptions<Scheme extends CollectionScheme, Driver extends Coll
 export class DataSource<Scheme extends CollectionScheme, Driver extends CollectionDriver = CollectionDriver> {
   public driver: Driver
   public scheme: DataScheme<Scheme>
-  public collections = {} as Collections<Scheme>
+  public collections = {} as CollectionsOf<Scheme>
 
   private writeListeners = new Set<(write: CollectionWrite) => void>()
 

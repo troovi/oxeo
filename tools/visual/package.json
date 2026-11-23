@@ -1,7 +1,7 @@
 {
   "name": "@oxeo/visual",
-  "version": "0.2.0",
-  "description": "Интерактивная карта схемы данных oxeo: модели, поля, embedded-блоки и связи по исходникам схемы.",
+  "version": "0.3.0",
+  "description": "Интерактивная карта схемы данных oxeo и страница операций: модели, поля, связи, операции доменов и их доступ.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/troovi/oxeo.git",
@@ -19,21 +19,29 @@
   "scripts": {
     "echo": "echo \"@oxeo/visual\"",
     "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc -p tsconfig.client.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.client.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.client.json",
+    "test": "vitest run"
   },
   "dependencies": {
     "libavoid-js": "0.4.5",
     "typescript": "^5.4.0"
   },
   "peerDependencies": {
+    "@oxeo/scheme": ">=0.6.0",
     "ts-node": ">=10"
   },
   "peerDependenciesMeta": {
+    "@oxeo/scheme": {
+      "optional": true
+    },
     "ts-node": {
       "optional": true
     }
   },
   "devDependencies": {
-    "@types/node": "*"
+    "@oxeo/scheme": "file:../../core/scheme",
+    "@types/node": "*",
+    "vitest": "^4.1.12",
+    "zod": "^4.3.6"
   }
 }

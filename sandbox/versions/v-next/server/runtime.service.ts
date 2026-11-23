@@ -15,10 +15,8 @@ import { Subject } from 'rxjs'
 import { DataSource, DomainEvent, DomainRuntime, QueryBatch, createMemoryDriver } from '../lib/server'
 import { Actor } from '../core/domains'
 import { AppDomains, appDomains } from '../core/domains'
-import { appParams } from '../core/domains/params'
 import { AppScheme, dataScheme } from '../core/scheme'
 import { AppViews, appViews } from '../core/views'
-import { appViewParams } from '../core/views/params'
 import { seed } from './seed'
 
 /** Идентичность вызова — сотрудник из заголовка `x-worker-id`; без заголовка вызов системный. */
@@ -134,9 +132,7 @@ export class RuntimeService implements OnModuleInit {
     this.source = source
     this.runtime = new DomainRuntime({
       domains: appDomains,
-      params: appParams,
       views: appViews,
-      viewParams: appViewParams,
       dataSource: source,
       counterCollection: 'counter',
       /** Актор — работающий сотрудник; уволенный или неизвестный — отказ. */

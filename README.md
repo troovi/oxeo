@@ -18,16 +18,17 @@ project/
   core/                  схемы, домены и параметры операций — общие для сервера и клиента
     keys.ts              перечисления: значения без oxeo, их можно импортировать и на клиенте
     scheme.ts            модели и DataScheme
+    register.ts          типы проекта для oxeo: схема, актор, источники номеров, роли
     domains/
       index.ts           реестр доменов
-      params.ts          реестр схем параметров — рантайму
+      descriptions.ts    описания операций для человека
       <name>/
         <name>.domain.ts операции
         <name>.params.ts параметры операций на zod
+        <name>.service.ts сервис области — код, нужный нескольким доменам и представлениям
     views/
       index.ts           реестр представлений
-      params.ts          реестр схем параметров представлений — рантайму
-      <name>.views.ts    чтения, которые считает сервер
+      <name>.view.ts     чтения, которые считает сервер
   server/                серверное приложение: рантайм доменов, драйвер базы, маршруты
   client/                клиентское приложение: клиент oxeo, компоненты
 ```
@@ -38,9 +39,9 @@ project/
 | `server` | рантайм, драйвер, маршруты, транспорт   | исполняет в рантайме  | `@oxeo/server`, драйвер базы             |
 | `client` | клиент oxeo, компоненты, экраны         | **только типы**       | `@oxeo/client`, привязка (`@oxeo/react`) |
 
-Главное правило структуры: клиент импортирует из `core` только типы, через `import type`. Схемы, реализация доменов и
-zod предназначены серверу. Из `import type` сборщик ничего не берёт, поэтому ни декораторы, ни домены, ни zod в сборку
-клиента не попадают, а клиент всё равно знает тип каждой записи и каждого вызова.
+Главное правило структуры: клиент импортирует из `core` только типы, через `import type`. Схемы, реализация доменов,
+zod и полифил `reflect-metadata` предназначены серверу. Из `import type` сборщик ничего не берёт, поэтому ни
+декораторы, ни домены, ни zod в сборку клиента не попадают, а клиент всё равно знает тип каждой записи и каждого вызова.
 
 Значения из `core` клиент импортирует только из файлов без oxeo: например, перечисления `keys.ts`. Импорт значения из
 файла со схемой или доменом потянет за собой весь `@oxeo/scheme`.
@@ -103,27 +104,54 @@ export const dataScheme = new DataScheme({
 export type AppScheme = InferScheme<typeof dataScheme>
 ```
 
-Домен — класс над своим окружением. Коллекции и выдача идентификаторов одни на все вызовы, поэтому приходят в
-конструктор. То, что у каждого вызова своё, — актор, момент и дата — приходит вторым аргументом метода, контекстом.
-Метод, которому контекст не нужен, его не объявляет. Отказ — `DomainError`.
+Типы проекта библиотека узнаёт из `Register` — проект расширяет его один раз. По нему типизированы токены окружения
+`Collections` и `Ids`, контексты `DomainContext` и `ViewContext` и роли `@Allow`. Без расширения всё работает, типы
+широкие: любая схема, актор `unknown`, источники номеров и роли — строки.
+
+```ts
+// core/register.ts
+import type { Actor } from './domains/context'
+import type { AppKey } from './keys'
+import type { AppScheme } from './scheme'
+
+declare module '@oxeo/scheme' {
+  interface Register {
+    scheme: AppScheme
+    actor: Actor
+    counters: AppKey.CounterSource
+    roles: AppKey.Position
+  }
+}
+```
+
+Расширяется сам модуль `@oxeo/scheme`: расширение модуля, который его реэкспортирует, TypeScript с исходным объявлением
+не сливает.
+
+Домен — класс над своим окружением. Коллекции и выдача идентификаторов одни на все вызовы: их, как и сервисы, домен
+получает в конструктор, а собирает его контейнер рантайма (раздел «Зависимости»). То, что у каждого вызова своё, —
+актор, момент и дата — приходит вторым аргументом метода, контекстом. Метод, которому контекст не нужен, его не
+объявляет. Отказ — `DomainError` (раздел «Ошибки»).
 
 ```ts
 // core/domains/notes/notes.domain.ts
-import { Collections, DomainContext, DomainError, IdSource } from '@oxeo/scheme'
+import { Collections, Ids, Params, notFound } from '@oxeo/scheme'
+import type { DomainContext } from '@oxeo/scheme'
+import { Domain } from '@oxeo/scheme/di'
 import { z } from 'zod'
-import { AppScheme } from '../../scheme'
 import { NotesParams } from './notes.params'
 
+@Domain()
 export class NotesDomain {
   constructor(
-    private collections: Collections<AppScheme>,
-    private ids: IdSource
+    private collections: Collections,
+    private ids: Ids
   ) {}
 
   /** Новая заметка автора; возвращает её номер. */
+  @Params(NotesParams.Add)
   async add(params: z.infer<typeof NotesParams.Add>, ctx: DomainContext) {
     if (!(await this.collections.author.exists(params.authorId))) {
-      throw new DomainError('notFound', 'Автор не найден')
+      throw notFound('Автор')
     }
 
     const noteId = await this.ids.number('notes')
@@ -135,9 +163,10 @@ export class NotesDomain {
 }
 ```
 
-Параметры операций выводятся из моделей через `schemaOf`, реестр доменов и его тип экспортируются из
-`core/domains/index.ts`. Схемы собираются в реестр `createDomainsParams`: по типу доменов он знает все публичные методы,
-поэтому компилятор не пропустит метод без схемы, лишний метод и схему не того типа.
+Параметры операций выводятся из моделей через `schemaOf` и лежат рядом с доменом. Схему метода задаёт декоратор
+`@Params`: рантайм проверяет ею каждый вызов, а методы со схемой — список операций домена. Результат схемы должен
+подходить первому параметру метода, иначе декоратор не компилируется. Реестр доменов и его тип экспортируются из
+`core/domains/index.ts`.
 
 ```ts
 // core/domains/notes/notes.params.ts
@@ -152,16 +181,227 @@ export namespace NotesParams {
 export const appDomains = { notes: NotesDomain }
 
 export type AppDomains = typeof appDomains
+```
 
-// core/domains/params.ts
-import { createDomainsParams } from '@oxeo/scheme'
-import type { AppDomains } from './index'
-import { NotesParams } from './notes/notes.params'
+Схемы класса отдаёт `paramsOf(NotesDomain)` — карта «метод → схема» вместе с методами базовых классов: по ней приложение
+обходит операции. Рантайм метод без схемы не вызывает: вызов отвечает `notFound`, как неизвестная операция, поэтому
+`private`-помощник класса по маршруту не вызвать. Полноту схем (у каждого публичного метода есть `@Params`) проверяет
+приложение — например, тестом по исходникам (раздел «Тесты проекта»).
 
-export const appParams = createDomainsParams<AppDomains>({
-  notes: { add: NotesParams.Add }
+### Зависимости
+
+Домены, представления и их сервисы собирает контейнер `@oxeo/server` по типам параметров конструктора, как в NestJS.
+Типы TypeScript пишет в метаданные `design:paramtypes`, и для этого нужны три вещи:
+
+- `experimentalDecorators` и `emitDecoratorMetadata` в tsconfig — и трансформер, который их выполняет. `tsc` и vitest 4
+  на Vite 8 (oxc) метаданные пишут, esbuild — `tsx`, vitest 3 — нет. С `isolatedModules` тип без значения в сигнатуре
+  декорированного члена — интерфейс, алиас, `DomainContext` — импортируется через `import type`, иначе `tsc` даёт
+  TS1272;
+- декоратор роли из `@oxeo/scheme/di` над классом: `@Domain()`, `@Service()` или `@View()`. Без декоратора TypeScript
+  метаданные класса не выпускает, а роль задаёт правила графа;
+- полифил `reflect-metadata`, загруженный до объявления класса: без него метаданные молча не записываются. Вход
+  `@oxeo/scheme/di` загружает его первой строкой, поэтому хватает импорта декоратора в файле класса. В главный вход
+  пакета полифил не попадает: главный вход грузит и клиент.
+
+| Роль         | Класс                             | Правило                                                   |
+| ------------ | --------------------------------- | --------------------------------------------------------- |
+| `@Domain()`  | класс реестра доменов             | корень графа: параметром конструктора не внедряется       |
+| `@View()`    | класс реестра представлений       | корень графа: параметром конструктора не внедряется       |
+| `@Service()` | общий код доменов и представлений | зависит только от сервисов и токенов `Collections`, `Ids` |
+
+Контейнеру роль нужна у класса с параметрами конструктора и у класса реестра: домену — `@Domain()`, представлению —
+`@View()`, иначе рантайм не стартует.
+
+Регламент имён — по роли: файл `<имя>.<роль>.ts`, в нём класс `<Имя><Роль>`, роль — декоратором. `payouts.domain.ts` →
+`PayoutsDomain` с `@Domain()`, `task-subjects.service.ts` → `TaskSubjectsService` с `@Service()`, `payouts.view.ts` →
+`PayoutsView` с `@View()`. Роль есть у каждого класса такого файла, даже без параметров конструктора, а класс с ролью
+лежит только в таком файле. Параметр конструктора с сервисом называется как сервис в camelCase, как в Nest:
+`shiftsService: ShiftsService`; токенов `Collections`, `Ids` и других параметров правило не касается. Регламент
+проверяет `checkDomains` (раздел «Тесты проекта»).
+
+Коллекции и выдачу идентификаторов контейнер подставляет по токенам `Collections` и `Ids` из `@oxeo/scheme` — классам
+библиотеки, слитым с интерфейсами: тип — по `Register`, в метаданных — сам класс. Импорт обычный, не `import type`:
+иначе в метаданных окажется `Object`. Свой токен проекта, если он понадобится, — абстрактный класс, слитый с
+интерфейсом, в своём модуле: объявленный в одном файле с классом, который его просит, он приходит в метаданные как
+`Object`.
+
+```ts
+// core/domains/authors/authors.service.ts
+@Service()
+export class AuthorsService {
+  constructor(private collections: Collections) {}
+
+  async load(authorId: number) { … }
+}
+
+// core/domains/notes/notes.domain.ts
+@Domain()
+export class NotesDomain {
+  constructor(
+    private collections: Collections,
+    private ids: Ids,
+    private authorsService: AuthorsService
+  ) {}
+}
+```
+
+Областей две. Область рантайма создаётся вместе с рантаймом: в ней коллекции источника, выдача идентификаторов и по
+одному экземпляру каждого класса, поэтому домены и их сервисы общие на все вызовы. Область представления — дочерняя,
+своя на каждый расчёт значения: коллекции в ней только на чтение и записывают прочитанное, выдачи идентификаторов нет,
+класс представлений и его сервисы собираются заново. Экземпляры области рантайма в неё не попадают: их чтения прошли бы
+мимо учёта кэша. `runtime.get(Class)` отдаёт экземпляр из области рантайма.
+
+Рантайм проверяет классы при старте, в конструкторе: роли классов реестров, сборку всех доменов и пробную сборку каждого
+представления. Класс, который не собрать, — `InjectionError` с цепочкой от класса, с которого началась сборка:
+
+```
+NotesDomain: класс реестра доменов без @Domain()
+цикл зависимостей: SheetsService → ShiftsService → SheetsService
+WorkersService: класс с параметрами без роли — нужен @Service()
+SheetsDomain: параметр 2 — не класс: import type, интерфейс или цикл импортов
+PayoutsDomain → ShiftsDomain: домен — корень графа, параметром конструктора не внедряется
+PayoutsDomain → SheetsService → ShiftsDomain: сервис зависит только от сервисов, Collections и Ids — не от домена и не от представления
+Ids нет в представлении: PayoutsView → RegistersService
+```
+
+### Доступ
+
+Кто вызывает операцию, задаёт декоратор над методом домена: `@Allow(...роли)` — только эти роли, система проходит;
+`@System(текст)` — только система, актору отказ с этим текстом. Операция без декоратора открыта любому актору. Роли
+типизирует `Register.roles`.
+
+```ts
+@Allow('director', 'recruiter')
+@Params(WorkersParams.Hire)
+async hire(params: z.infer<typeof WorkersParams.Hire>, ctx: DomainContext) { … }
+
+@System('Отчёт строит планировщик')
+@Params(z.object({}))
+async report(_params: {}) { … }
+```
+
+Декоратор только записывает доступ, проверяет его рантайм — после схемы параметров и актора, до тела метода. Отказ —
+`DomainError` с кодом `forbidden` и текстом «Действие доступно только: <подписи ролей>», у `@System` — свой текст;
+записей и ревизии нет. Роли актора и подписи даёт опция рантайма `access`; без неё ролей нет, и операции `@Allow`
+доступны только системе.
+
+```ts
+new DomainRuntime({
+  …,
+  access: { rolesOf: (actor) => actor.positions, labelOf: (role) => POSITIONS[role].short }
 })
 ```
+
+Индекс доступа строится без рантайма — по нему интерфейс решает, что показать, а сервер — что закрыть для HTTP:
+`createAccessIndex(appDomains)` один раз обходит реестр и отвечает `allowed(roles)` — операции, доступные ролям
+(открытые и разрешённые, без служебных), `system()` — служебные операции и `of(domain, method)` — доступ операции: роли,
+`'system'` или `null`. Доступ метода по классу — `accessOf(Class, method)`.
+
+### Ошибки
+
+Отказ домена — `DomainError` из `@oxeo/scheme`: `code` — для программ, `message` — для людей. Базовые коды — по смыслу
+отказа:
+
+| Код            | Когда                                                                                          |
+| -------------- | ---------------------------------------------------------------------------------------------- |
+| `notFound`     | записи с таким id нет                                                                          |
+| `forbidden`    | вызывает не тот: роль (`@Allow`), служебная операция (`@System`), действие «от себя» — система |
+| `invalidStage` | состояние записи, своей или по ссылке, не пускает сейчас: этап, статус                         |
+| `invariant`    | вход противоречит правилу, исправить нужно параметры: дата в будущем, не тот тип               |
+| `conflict`     | значение занято другой записью или повторено в параметрах                                      |
+
+Рантайм бросает ещё `params` — `ParamsError` с `issues`. Свои коды и поля проект добавляет наследником:
+`class AppDomainError extends DomainError<DomainErrorCode | 'taskDecision'>`; рантайм и сервер узнают любого
+наследника по базовому классу.
+
+| Помощник                              | Что делает                                                              |
+| ------------------------------------- | ----------------------------------------------------------------------- |
+| `notFound(what)`                      | ошибка `notFound` «Не найдено: <что>»                                   |
+| `existing(read, what)`                | запись из чтения или отказ `notFound(what)`                             |
+| `assertNone(reasons, { code, lead })` | отказ «<lead>: причина; причина», если причины есть                     |
+| `isSystem(ctx)`                       | вызывает система                                                        |
+| `requireActor(ctx)`                   | актор вызова или отказ `forbidden` «Действие требует вход пользователя» |
+
+### Описания операций
+
+Описания для человека — тип `DomainsDescriptions<AppDomains>`: у домена название, что в нём, и описания всех операций,
+у операции — название действия и что она делает. Компилятор не пропустит домен или операцию без описания и описание
+операции, которой нет. По описаниям `@oxeo/visual` строит страницу «Операции» рядом с картой схемы и таблицу операций в
+README (раздел «Пакеты»).
+
+```ts
+export const appDomainsDescriptions: DomainsDescriptions<AppDomains> = {
+  notes: {
+    title: 'Заметки',
+    description: 'Тексты авторов.',
+    methods: { add: { title: 'Добавить заметку', description: 'Новая заметка автора.' } }
+  }
+}
+```
+
+### Тесты проекта
+
+Вход `@oxeo/server/testing` — для тестов проекта. Стенд `createStand` — рантайм над базой в памяти: `run` выполняет
+операцию так же, как сервер, чтения доменов отдают копии, как Mongo, часы стенда свои — каждый вызов на минуту позже.
+
+```ts
+const stand = await createStand({
+  scheme: dataScheme,
+  domains: appDomains,
+  views: appViews,
+  clock: T0,
+  today: toDateISO,
+  seed: (collections) => seedWorld(collections),
+  access: { rolesOf: (actor) => actor.positions },
+  // повтор после отказа без записи: новые параметры или null — отказ уходит тесту
+  retry: (error, call) => (error instanceof AppDomainError && error.draft ? { ...call.params, task: … } : null)
+})
+
+const noteId = await stand.run({ domain: 'notes', method: 'add', params, actor })
+const note = await stand.record('note', noteId)
+```
+
+| Член стенда                                     | Что это                                                                  |
+| ----------------------------------------------- | ------------------------------------------------------------------------ |
+| `run({ domain, method, params, actor, retry })` | вызов как на сервере; без актора — система, `retry: false` — без повтора |
+| `record`, `recordBy`                            | запись, которая обязана быть: нет — тест падает с именем коллекции       |
+| `get(Class)`                                    | экземпляр из области рантайма — сервис, который получают домены          |
+| `events`, `partialWrites`                       | события операций и вызовы, упавшие после записи                          |
+| `collections`, `runtime`                        | база стенда для посева и проверок, рантайм — для пакетов запросов        |
+| `now`, `today`, `advance(ms)`                   | момент и дата следующего вызова, сдвиг часов                             |
+
+Полноту по исходникам проверяет `checkDomains({ tsconfig, registries, include? })` на TypeScript API:
+- роль у классов реестров и у классов графа с параметрами конструктора, правила ролей;
+- `@Params` у публичных методов доменов и представлений;
+- типы параметров: интерфейс, алиас, примитив, `import type` или токен в одном файле с классом дают в метаданных
+  `Object`;
+- регламент имён: файлы и классы в папках `include` (по умолчанию — во всех файлах программы), имена параметров с
+  сервисами.
+
+Ответ — список нарушений «файл: Класс.метод — что не так»; тест ждёт пустой список.
+
+```
+payouts/payouts.view.ts: PayoutsReader — класс с @View() называется PayoutsView
+salary/salary.service.ts: SalaryService — нет декоратора роли @Service()
+shifts/helpers.ts: ShiftsService — класс с @Service() лежит в shifts.service.ts
+sheets/sheets.domain.ts: SheetsDomain — параметр shifts: ShiftsService называется shiftsService
+payouts/payouts.domain.ts: PayoutsDomain.preview — публичный метод без @Params
+```
+
+```ts
+expect(
+  checkDomains({
+    tsconfig: 'tsconfig.json',
+    registries: {
+      domains: { file: 'domains/index.ts', name: 'appDomains' },
+      views: { file: 'views/index.ts', name: 'appViews' }
+    }
+  })
+).toEqual([])
+```
+
+Стенду нужен драйвер `@oxeo-drivers/memory`, проверке — `typescript`: обе — необязательные peer-зависимости, проверка
+берёт `typescript` только при вызове.
 
 ## server
 
@@ -169,9 +409,9 @@ export const appParams = createDomainsParams<AppDomains>({
 рассылает события всем клиентам и отвечает на пакеты запросов. Фреймворк и транспорт — забота приложения: `runtime.run` и
 `runtime.query` вешаются на свои маршруты, `broadcast` уходит в свой поток событий.
 
-Параметры каждого вызова проверяет сам рантайм, поэтому маршруту проверять их не нужно. Операции нет в реестре схем —
-`DomainError` с кодом `notFound`, параметры не прошли — `ParamsError` с `issues`. Перевести отказ в ответ — забота
-приложения.
+Параметры каждого вызова проверяет сам рантайм схемой `@Params`, поэтому маршруту проверять их не нужно. Метода нет или
+у него нет схемы — `DomainError` с кодом `notFound`, параметры не прошли — `ParamsError` с `issues`, доступ не пускает —
+`forbidden`. Перевести отказ в ответ — забота приложения.
 
 Пакет запросов не падает целиком из-за одного запроса. Коллекции нет, параметры представления не прошли схему,
 представление упало — результатом этого запроса будет `{ error: { code, message } }`, а остальные запросы пакета
@@ -187,17 +427,16 @@ export const appParams = createDomainsParams<AppDomains>({
 import { createMongoDriver } from '@oxeo-drivers/mongo'
 import { DataSource, DomainRuntime } from '@oxeo/server'
 import { appDomains } from '../core/domains'
-import { appParams } from '../core/domains/params'
 import { dataScheme } from '../core/scheme'
 
 const source = new DataSource(dataScheme, { createDriver: createMongoDriver({ connection }) })
 
 export const runtime = new DomainRuntime({
   domains: appDomains,
-  params: appParams,
   dataSource: source,
   counterCollection: 'counter',
   resolveActor: (identity) => resolveActor(identity),
+  access: { rolesOf: (actor) => actor.positions },
   today: (at) => toDateISO(at),
   broadcast: (event) => stream.send(event),
   onPartialWrite: () => stream.resync()
@@ -207,41 +446,38 @@ export const runtime = new DomainRuntime({
 ### Представления
 
 Представление — чтение, которое считает сервер и отдаёт клиенту значением: сводки, агрегаты, выборки с логикой, которую
-не выражает фильтр. Клиенту не нужны записи, из которых значение сложено. Класс представлений получает в конструкторе
-только коллекции, метод — `(params, ctx)`, где `ctx` — кто смотрит и какой сегодня день; результат — JSON. Параметры, как у
-операций, проверяет реестр схем.
+не выражает фильтр. Клиенту не нужны записи, из которых значение сложено. Класс представлений собирает контейнер в
+области представления: коллекции в нём только на чтение, выдачи идентификаторов нет. Метод — `(params, ctx)`, где
+`ctx` — кто смотрит и какой сегодня день; результат — JSON. Параметры, как у операций, задаёт `@Params`.
 
 ```ts
-// core/views/stats.views.ts
-export class StatsViews {
-  constructor(private collections: Collections<AppScheme>) {}
+// core/views/stats.view.ts
+@View()
+export class StatsView {
+  constructor(private collections: Collections) {}
 
-  async drafts(params: { authorId: number }, ctx: ViewContext<Actor>) {
+  @Params(z.object({ authorId: z.number() }))
+  async drafts(params: { authorId: number }, ctx: ViewContext) {
     return this.collections.note.count({ authorId: params.authorId, status: 'draft' })
   }
 }
 
 // core/views/index.ts
-export const appViews = { stats: StatsViews }
+export const appViews = { stats: StatsView }
 
 export type AppViews = typeof appViews
 
-// core/views/params.ts
-export const appViewParams = createViewsParams<AppViews>({
-  stats: { drafts: z.object({ authorId: z.number() }) }
-})
-
 // server/runtime.ts
-new DomainRuntime({ domains, params, views: appViews, viewParams: appViewParams, … })
+new DomainRuntime({ domains: appDomains, views: appViews, … })
 
 // маршрут пакета запросов: идентичность — для ctx представлений
 runtime.query(batch, identity)
 ```
 
 Рантайм кэширует значение на день по представлению, методу, параметрам и идентичности. Расчёт идёт над коллекциями,
-которые запоминают, что прочитано, и не дают писать: запись из представления — `DomainError` с кодом `forbidden`.
-Операция, которая писала в прочитанные коллекции, — удачная или упавшая на полпути, — сбрасывает значение. Ответ несёт
-значение и список прочитанных коллекций: по нему клиент знает, когда перезапросить.
+которые запоминают, что прочитано, и не дают писать: запись из представления или его сервиса — `DomainError` с кодом
+`forbidden`. Операция, которая писала в прочитанные коллекции, — удачная или упавшая на полпути, — сбрасывает значение.
+Ответ несёт значение и список прочитанных коллекций: по нему клиент знает, когда перезапросить.
 
 ### Порядок и предел
 
@@ -452,15 +688,15 @@ const { data } = useDb((db, views) => {
 
 | Папка            | Пакет                  | Что в нём                                                                                           | Кто берёт                    |
 | ---------------- | ---------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------- |
-| `core/scheme`    | `@oxeo/scheme`         | декораторы, `DataScheme`, `schemaOf`, контракт доменов, представлений и коллекций, фильтр, протокол | `core`; клиент — только типы |
-| `core/server`    | `@oxeo/server`         | `DataSource`, `DataProcessor`, `DomainRuntime`, договор драйвера                                    | сервер                       |
+| `core/scheme`    | `@oxeo/scheme`         | декораторы, `DataScheme`, `Register`, `@Params`, доступ, ошибки, контракт доменов, фильтр, протокол | `core`; клиент — только типы |
+| `core/server`    | `@oxeo/server`         | `DataSource`, `DomainRuntime` и контейнер, договор драйвера; вход `testing` — стенд и `checkDomains` | сервер; тесты проекта        |
 | `core/client`    | `@oxeo/client`         | живая часть базы, чтения, пакеты запросов, события, вызовы операций                                 | клиент                       |
 | `core/react`     | `@oxeo/react`          | `createUseDb`                                                                                       | клиент на React              |
 | `core/types`     | `@oxeo/types`          | типы HTTP-маршрутов и файлов                                                                        | приложения                   |
 | `drivers/mongo`  | `@oxeo-drivers/mongo`  | драйвер MongoDB, модуль NestJS                                                                      | сервер                       |
 | `drivers/memory` | `@oxeo-drivers/memory` | драйвер в памяти процесса                                                                           | тесты доменов, песочницы     |
 | `tools/devkit`   | `@oxeo/devkit`         | макетная схема и кейсы целостности; не публикуется                                                  | тесты пакетов                |
-| `tools/visual`   | `@oxeo/visual`         | интерактивная карта схемы                                                                           | проект, для разработки       |
+| `tools/visual`   | `@oxeo/visual`         | интерактивная карта схемы, страница «Операции» и таблица операций в README                          | проект, для разработки       |
 | `sandbox`        | `@oxeo/sandbox`        | песочница версий библиотеки; не публикуется, устройство — `sandbox/README.md`                       | разработка oxeo              |
 
 Зависимости идут в одну сторону. Драйверы зависят от `@oxeo/server`, он — от `@oxeo/scheme`. Клиентская ветка от
@@ -474,13 +710,20 @@ const { data } = useDb((db, views) => {
 Что куда кладётся:
 
 - `@oxeo/scheme` — то, на чём пишется `core`, и типы, общие для сервера и клиента: `Collections`, `Where`,
-  `DomainContext`, протокол. Домены и схемы импортируют только его.
-- `@oxeo/server` — всё, что исполняется только на сервере. Конкретных драйверов и фреймворка в нём нет.
+  `DomainContext`, протокол. Домены и схемы импортируют только его: главный вход и `@oxeo/scheme/di`.
+- `@oxeo/server` — всё, что исполняется только на сервере. Конкретных драйверов и фреймворка в нём нет. Вход
+  `@oxeo/server/testing` — для тестов проекта: стенд над драйвером памяти и проверка полноты по исходникам.
 - `@oxeo/client` — всё, что исполняется только на клиенте. От схемы он берёт типы.
 
 Единственное общее для сервера и клиента в рантайме — сверка записи с фильтром `matches` и порядок окна `windowOf`: тот
-же код работает в драйвере памяти и на клиенте. Поэтому у `@oxeo/scheme` два входа: главный и `@oxeo/scheme/filter` без декораторов и zod. Сборка
-`@oxeo/client` вшивает этот вход в себя, и в рантайме клиент к `@oxeo/scheme` не обращается.
+же код работает в драйвере памяти и на клиенте. Поэтому у `@oxeo/scheme` отдельный вход `@oxeo/scheme/filter` без
+декораторов и zod. Сборка `@oxeo/client` вшивает этот вход в себя, и в рантайме клиент к `@oxeo/scheme` не обращается.
+Третий вход, `@oxeo/scheme/di`, — роли классов `@Domain()`, `@Service()`, `@View()` с полифилом `reflect-metadata`:
+он нужен только серверу, поэтому в главный вход не входит.
+
+`@oxeo/visual` с `operations` в конфиге (реестр доменов, описания и подписи ролей) строит рядом с картой схемы страницу
+«Операции» — домены, операции, описания, доступ и схему параметров, а `oxeo-visual ops-map` пишет таблицу операций в
+README между маркерами `<!-- ops:map:start -->` и `<!-- ops:map:end -->` (`tools/visual/README.md`).
 
 ## Разработка
 
@@ -490,9 +733,13 @@ const { data } = useDb((db, views) => {
 ```
 npm install
 npm run build      # все пакеты в нужном порядке
-npm test           # тесты core/scheme, core/server и core/client
+npm test           # тесты core/scheme, core/server, core/client, core/react, tools/visual и песочницы
 npm run test:mongo # кейсы целостности на MongoDB (127.0.0.1:27017, база oxeo-test)
 ```
+
+Тесты пакетов идут на vitest 4, а он — на Vite 8 (`overrides` в корневом `package.json`): трансформер oxc пишет
+`design:paramtypes`, без них контейнер не собрать. Vite 7 с esbuild метаданных не пишет; на нём остаются playground
+`core/react` и приложение песочницы.
 
 Тесты драйвера идут на `mongoose` 9.3.3, закреплённом в `drivers/mongo`: начиная с драйвера `mongodb` 7.6 рукопожатие с
 базой под jest не проходит, на обычном Node оно работает. Диапазон для приложений — `^9.0.0`.

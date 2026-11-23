@@ -1,28 +1,35 @@
 /**
- * Общий пример тестов рантайма и клиента: маленькая схема заметок, домен и рантайм над in-memory драйвером. Отдельным файлом
- * рядом с тестами, а не в `@oxeo/devkit`: его модели попали бы в одно хранилище метаданных с макетной схемой.
+ * Общий пример тестов рантайма и стенда: маленькая схема заметок, типы проекта в `Register`, домен, представления и
+ * сервис над токенами `Collections` и `Ids`, рантайм над in-memory драйвером. Отдельным файлом рядом с тестами, а не в
+ * `@oxeo/devkit`: его модели попали бы в одно хранилище метаданных с макетной схемой.
  */
 import { createMemoryDriver } from '@oxeo-drivers/memory'
 import {
+  Allow,
   Collections,
   DataScheme,
   DomainContext,
   DomainError,
   DomainEvent,
-  IdSource,
   Identifier,
+  Ids,
   Model,
+  Params,
   Prop,
   ReferenceTo,
+  System,
   ViewContext,
-  createDomainsParams,
-  createViewsParams,
   defineCollection,
   schemaOf
 } from '@oxeo/scheme'
+import { Domain, Service, View } from '@oxeo/scheme/di'
 import { DataSource, DomainRuntime, PartialWrite, QueryFailure } from '../lib'
 
-type Source = 'notes' | 'authors'
+export type Source = 'notes' | 'authors'
+
+export type Role = 'editor' | 'reader'
+
+export const ROLE_LABELS: Record<Role, string> = { editor: 'Редактор', reader: 'Читатель' }
 
 @Model({ name: 'Counter' })
 class CounterEntity {
@@ -60,7 +67,7 @@ class NoteEntity {
   authorId: AuthorEntity['authorId']
 }
 
-const scheme = new DataScheme({
+export const scheme = new DataScheme({
   counter: defineCollection(CounterEntity, 'source'),
   author: defineCollection(AuthorEntity, 'authorId'),
   note: defineCollection(NoteEntity, 'noteId')
@@ -68,16 +75,45 @@ const scheme = new DataScheme({
 
 export type Scheme = typeof scheme extends DataScheme<infer S> ? S : never
 
-interface Actor {
+export interface Actor {
   name: string
+  roles: Role[]
 }
 
-class NotesDomain {
+declare module '@oxeo/scheme' {
+  interface Register {
+    scheme: Scheme
+    actor: Actor
+    counters: Source
+    roles: Role
+  }
+}
+
+/** Сервис заметок: его получают и домен, и представления — каждый в своей области. */
+@Service()
+export class NotesService {
+  constructor(private collections: Collections) {}
+
+  /** Заметки автора. */
+  async notesOf(authorId: number) {
+    return this.collections.note.findBy({ authorId })
+  }
+
+  /** Удаление заметки: из представления — отказ. */
+  async removeNote(noteId: number) {
+    await this.collections.note.remove(noteId)
+  }
+}
+
+@Domain()
+export class NotesDomain {
   constructor(
-    private collections: Collections<Scheme>,
-    private ids: IdSource<Source>
+    private collections: Collections,
+    private ids: Ids,
+    readonly notesService: NotesService
   ) {}
 
+  @Params(schemaOf(AuthorEntity).pick({ name: true }))
   async addAuthor(params: { name: string }) {
     const authorId = await this.ids.number('authors')
 
@@ -86,7 +122,8 @@ class NotesDomain {
     return authorId
   }
 
-  async add(params: { text: string; authorId: number }, ctx: DomainContext<Actor>) {
+  @Params(schemaOf(NoteEntity).pick({ text: true, authorId: true }))
+  async add(params: { text: string; authorId: number }, ctx: DomainContext) {
     const noteId = await this.ids.number('notes')
 
     await this.collections.note.create({
@@ -100,27 +137,47 @@ class NotesDomain {
     return noteId
   }
 
+  @Params(schemaOf(NoteEntity).pick({ noteId: true }))
   async publish(params: { noteId: number }) {
     await this.collections.note.update(params.noteId, (draft) => {
       draft.status = 'published'
     })
   }
 
+  @Params(schemaOf(NoteEntity).pick({ noteId: true }))
   async remove(params: { noteId: number }) {
-    await this.collections.note.remove(params.noteId)
+    await this.notesService.removeNote(params.noteId)
   }
 
-  async whoami(_params: {}, ctx: DomainContext<Actor>) {
+  @Params(schemaOf(NoteEntity).pick({}))
+  async whoami(_params: {}, ctx: DomainContext) {
     return { actor: ctx.actor, today: ctx.today }
   }
 
   /** Пишет и падает — частичная запись (номер из счётчика записью не считается). */
-  async addBroken(params: { text: string; authorId: number }, ctx: DomainContext<Actor>) {
+  @Params(schemaOf(NoteEntity).pick({ text: true, authorId: true }))
+  async addBroken(params: { text: string; authorId: number }, ctx: DomainContext) {
     await this.add(params, ctx)
     throw new Error('after write')
   }
 
-  /** Помощник: `private` в рантайме не виден, закрывает его только отсутствие схемы. */
+  /** Новый текст заметки — только редактору. */
+  @Allow('editor')
+  @Params(schemaOf(NoteEntity).pick({ noteId: true, text: true }))
+  async rename(params: { noteId: number; text: string }) {
+    await this.collections.note.update(params.noteId, (draft) => {
+      draft.text = params.text
+    })
+  }
+
+  /** Служебная операция — только система. */
+  @System('Сверку запускает только система')
+  @Params(schemaOf(NoteEntity).pick({}))
+  async reconcile(_params: {}) {
+    return 'сверено'
+  }
+
+  /** Помощник: `private` в рантайме виден, закрывает его только отсутствие схемы. */
   private async hidden() {
     return 'скрытое'
   }
@@ -128,29 +185,27 @@ class NotesDomain {
 
 export const domains = { notes: NotesDomain }
 
-export const params = createDomainsParams<typeof domains>({
-  notes: {
-    addAuthor: schemaOf(AuthorEntity).pick({ name: true }),
-    add: schemaOf(NoteEntity).pick({ text: true, authorId: true }),
-    publish: schemaOf(NoteEntity).pick({ noteId: true }),
-    remove: schemaOf(NoteEntity).pick({ noteId: true }),
-    whoami: schemaOf(NoteEntity).pick({}),
-    addBroken: schemaOf(NoteEntity).pick({ text: true, authorId: true })
-  }
-})
-
 /** Сколько раз представления считались: кэш рантайма не должен считать их снова. */
 export const viewRuns = { count: 0 }
 
-class NotesViews {
-  constructor(private collections: Collections<Scheme>) {}
+/** Экземпляры, на которых считались представления, — по расчёту. */
+export const viewInstances: NotesView[] = []
 
-  /** Сводка автора: имя, черновики и опубликованные; кто смотрит — из контекста. */
-  async summary(params: { authorId: number }, ctx: ViewContext<Actor>) {
-    const notes = await this.collections.note.findBy({ authorId: params.authorId })
+@View()
+export class NotesView {
+  constructor(
+    private collections: Collections,
+    readonly notesService: NotesService
+  ) {}
+
+  /** Сводка автора: имя, черновики и опубликованные — заметки читает сервис; кто смотрит — из контекста. */
+  @Params(schemaOf(NoteEntity).pick({ authorId: true }))
+  async summary(params: { authorId: number }, ctx: ViewContext) {
+    const notes = await this.notesService.notesOf(params.authorId)
     const author = await this.collections.author.get(params.authorId)
 
     viewRuns.count += 1
+    viewInstances.push(this)
 
     return {
       author: author?.name ?? null,
@@ -160,12 +215,14 @@ class NotesViews {
     }
   }
 
-  /** Представление не пишет: запись — отказ. */
+  /** Представление не пишет, и сервис в нём тоже: запись — отказ. */
+  @Params(schemaOf(NoteEntity).pick({ noteId: true }))
   async broken(params: { noteId: number }) {
-    await this.collections.note.remove(params.noteId)
+    await this.notesService.removeNote(params.noteId)
   }
 
   /** Упавшее представление — непредвиденная ошибка расчёта. */
+  @Params(schemaOf(NoteEntity).pick({}))
   async crash(_params: {}) {
     const missing = (await this.collections.author.get(404)) as { name: string }
 
@@ -173,15 +230,7 @@ class NotesViews {
   }
 }
 
-export const views = { notes: NotesViews }
-
-export const viewParams = createViewsParams<typeof views>({
-  notes: {
-    summary: schemaOf(NoteEntity).pick({ authorId: true }),
-    broken: schemaOf(NoteEntity).pick({ noteId: true }),
-    crash: schemaOf(NoteEntity).pick({})
-  }
-})
+export const views = { notes: NotesView }
 
 export const source = () => new DataSource(scheme, { createDriver: createMemoryDriver })
 
@@ -199,9 +248,7 @@ export const createRuntime = () => {
 
   const runtime = new DomainRuntime({
     domains,
-    params,
     views,
-    viewParams,
     dataSource: serverSource,
     counterCollection: 'counter',
     resolveActor: (name: string): Actor => {
@@ -209,8 +256,9 @@ export const createRuntime = () => {
         throw new DomainError('forbidden', 'нет доступа')
       }
 
-      return { name }
+      return { name, roles: name === 'редактор' ? ['editor'] : [] }
     },
+    access: { rolesOf: (actor) => actor.roles, labelOf: (role) => ROLE_LABELS[role] },
     today: () => '2026-01-01',
     broadcast: (event) => {
       events.push(clone(event))

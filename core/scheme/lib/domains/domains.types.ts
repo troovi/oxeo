@@ -7,9 +7,12 @@ export interface DomainCall {
   params: unknown
 }
 
-/** Реестр доменов: ключ — имя в маршруте, значение — класс с конструктором `(collections, ids)`. */
+/**
+ * Реестр доменов: ключ — имя в маршруте, значение — класс. Экземпляр собирает контейнер рантайма по типам параметров
+ * конструктора; класс реестра — с ролью `@Domain()` из `@oxeo/scheme/di`.
+ */
 export interface DomainsMap {
-  [domain: string]: new (collections: any, ids: any) => object
+  [domain: string]: new (...args: any[]) => object
 }
 
 /** Маршруты доменов из сигнатур: метод → `{ params, answer }`, контекст в маршрут не входит. */

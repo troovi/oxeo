@@ -4,16 +4,21 @@ import * as path from 'path'
 import { CONFIG_FILES } from '../project'
 import { buildOnce } from './build-command'
 import { dev } from './dev'
+import { opsMap } from './ops-map'
 import { log } from './output'
 
 const HELP = `oxeo-visual — карта схемы данных oxeo
 
-  oxeo-visual dev    [--config <файл>] [--port <номер>] [--no-open]
-  oxeo-visual build  [--config <файл>] [--out <папка>]
+  oxeo-visual dev      [--config <файл>] [--port <номер>] [--no-open]
+  oxeo-visual build    [--config <файл>] [--out <папка>]
+  oxeo-visual ops-map  [--config <файл>] [--readme <файл>]
 
-  dev    сервер с картой в браузере: пересобирает карту при изменении схемы,
-         останавливается вместе со скриптом (Ctrl+C)
-  build  пишет <name>.html и <name>.svg в output.dir из конфига или в --out
+  dev      сервер с картой в браузере: пересобирает карту при изменении схемы,
+           останавливается вместе со скриптом (Ctrl+C)
+  build    пишет <name>.html и <name>.svg в output.dir из конфига или в --out,
+           с operations в конфиге — и <name>-operations.html
+  ops-map  пишет таблицу операций в README между <!-- ops:map:start --> и
+           <!-- ops:map:end -->: operations.readme из конфига или --readme
 
   Конфиг по умолчанию — ${CONFIG_FILES.join(', ')} в текущей папке.
 `
@@ -57,6 +62,8 @@ const main = async () => {
     await dev({ configPath: findConfig(value('config')), port, open: !flags.has('no-open') })
   } else if (command === 'build') {
     await buildOnce({ configPath: findConfig(value('config')), out: value('out') })
+  } else if (command === 'ops-map') {
+    await opsMap({ configPath: findConfig(value('config')), readme: value('readme') })
   } else {
     process.stdout.write(HELP)
     if (command && command !== 'help' && command !== '--help') process.exitCode = 1

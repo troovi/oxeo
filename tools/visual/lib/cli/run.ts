@@ -1,15 +1,15 @@
 /** Запуск сборки в дочернем процессе и ожидание её результата. */
 import { fork, type ChildProcess } from 'child_process'
 import * as path from 'path'
-import type { WorkerMessage } from './worker'
+import type { BuildMode, WorkerMessage } from './worker'
 
 export interface BuildRun {
   child: ChildProcess
   done: Promise<WorkerMessage>
 }
 
-export const startBuild = (configPath: string): BuildRun => {
-  const child = fork(path.join(__dirname, 'worker.js'), [configPath], {
+export const startBuild = (configPath: string, mode: BuildMode = 'map'): BuildRun => {
+  const child = fork(path.join(__dirname, 'worker.js'), [configPath, mode], {
     stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
     execArgv: []
   })

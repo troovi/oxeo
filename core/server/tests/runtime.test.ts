@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { DomainError, ParamsError, createDomainsParams } from '@oxeo/scheme'
+import { DomainError, ParamsError } from '@oxeo/scheme'
 import { createIdSource } from '../lib'
-import { createRuntime, domains, params, source, viewRuns } from './runtime.fixture'
+import { createRuntime, source, viewRuns } from './runtime.fixture'
 
 describe('выдача идентификаторов', () => {
   it('строки — hash, номера — по счётчику', async () => {
@@ -38,7 +38,7 @@ describe('DomainRuntime', () => {
       { collection: 'author', id: 1, record: { authorId: 1, name: 'Аня' } }
     ])
     expect(noteEvent.result).toBe(1)
-    expect(noteEvent.ctx).toEqual({ actor: { name: 'автор' }, at: 42, today: '2026-01-01' })
+    expect(noteEvent.ctx).toEqual({ actor: { name: 'автор', roles: [] }, at: 42, today: '2026-01-01' })
     expect(noteEvent.changes).toEqual([
       {
         collection: 'note',
@@ -93,17 +93,6 @@ describe('DomainRuntime', () => {
 
       await expect(call).rejects.toMatchObject({ code: 'notFound' })
     }
-  })
-
-  it('реестр схем проверяет компилятор: метод без схемы, лишний метод, схема не того типа', () => {
-    const { whoami, ...withoutWhoami } = params.notes
-
-    // @ts-expect-error нет схемы метода whoami
-    createDomainsParams<typeof domains>({ notes: withoutWhoami })
-    // @ts-expect-error схема другого метода: у publish параметры другие
-    createDomainsParams<typeof domains>({ notes: { ...params.notes, publish: params.notes.addAuthor } })
-    // @ts-expect-error такого метода у домена нет
-    createDomainsParams<typeof domains>({ notes: { ...params.notes, extra: whoami } })
   })
 
   it('частичная запись — onPartialWrite; отказ до записи и чужой актор — без ревизии', async () => {

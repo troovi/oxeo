@@ -10,11 +10,16 @@
   ],
   "scripts": {
     "build": "npm run build -w=@oxeo/types -w=@oxeo/visual -w=@oxeo/scheme && npm run build -w=@oxeo/server && npm run build -w=@oxeo-drivers/memory -w=@oxeo-drivers/mongo && npm run build -w=@oxeo/client && npm run build -w=@oxeo/react && npm run build -w=@oxeo/devkit",
-    "test": "npm run test -w=@oxeo/scheme -w=@oxeo/server -w=@oxeo/client -w=@oxeo/react",
+    "test": "npm run test -w=@oxeo/scheme -w=@oxeo/server -w=@oxeo/client -w=@oxeo/react -w=@oxeo/visual -w=@oxeo/sandbox",
     "test:mongo": "npm run test:cases -w=@oxeo-drivers/mongo",
     "github:setup": "node ./setup.js"
   },
   "devDependencies": {
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "vitest": {
+      "vite": "^8.3.5"
+    }
   }
 }

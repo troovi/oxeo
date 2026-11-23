@@ -17,6 +17,7 @@
  * схема с декораторами загружается заново и изменения в ней подхватываются без перезапуска.
  */
 import type { VisualConfig } from './config'
+import type { OperationsConfig } from './operations'
 import type { SchemeSource } from './scheme-meta'
 
 export interface OxeoVisualConfig extends VisualConfig {
@@ -33,6 +34,11 @@ export interface OxeoVisualConfig extends VisualConfig {
   watch?: string[]
   /** Куда `oxeo-visual build` пишет `<name>.html` и `<name>.svg`; по умолчанию папка конфига и `scheme-map`. */
   output?: { dir?: string; name?: string }
+  /**
+   * Страница «Операции» рядом с картой (`<name>-operations.html`) и таблица README (`oxeo-visual ops-map`): реестр
+   * доменов, описания операций и подписи ролей проекта.
+   */
+  operations?: OperationsConfig
 }
 
 export const defineConfig = (config: OxeoVisualConfig): OxeoVisualConfig => config

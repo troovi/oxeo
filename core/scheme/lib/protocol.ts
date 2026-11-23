@@ -3,7 +3,7 @@
  * коллекций oxeo: сервер выполняет запрос через коллекции, клиент тем же фильтром сверяет записи событий (`matches`).
  */
 import type { IType } from './core/types/collections.types'
-import type { DomainContext } from './domains/context'
+import type { DomainContextOf } from './domains/context'
 import type { FindOrder } from './filter'
 
 // queries
@@ -127,7 +127,7 @@ export interface DomainEvent<R = unknown> {
   domain: string
   method: string
   params: unknown
-  ctx: DomainContext
+  ctx: DomainContextOf
   result: R
   changes: RecordVersion[]
 }

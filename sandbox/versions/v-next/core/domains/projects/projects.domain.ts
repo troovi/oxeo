@@ -1,14 +1,15 @@
 import { z } from 'zod'
-import { Collections } from '../../../lib/scheme'
-import { DomainContext, DomainIds, invariant, notFound } from '../context'
-import { AppScheme } from '../../scheme'
+import { Collections, DomainContext, Ids, Params, existing, notFound } from '../../../lib/scheme'
+import { Domain } from '../../../lib/di'
+import { invariant } from '../context'
 import { ProjectsParams } from './projects.params'
 import { WorkersDomain } from '../workers/workers.domain'
 
+@Domain()
 export class ProjectsDomain {
   constructor(
-    private collections: Collections<AppScheme>,
-    private ids: DomainIds
+    private collections: Collections,
+    private ids: Ids
   ) {}
 
   // ------------------------------------------- operations --------------------------------------------
@@ -18,6 +19,7 @@ export class ProjectsDomain {
    * (`ReferenceSet` на несуществующий сотрудник), но уже после того, как счётчик сдвинулся без события.
    * Возвращает `projectId`.
    */
+  @Params(ProjectsParams.Create)
   async create(params: z.infer<typeof ProjectsParams.Create>, ctx: DomainContext) {
     const client = await this.collections.client.get(params.clientId)
 
@@ -49,6 +51,7 @@ export class ProjectsDomain {
   }
 
   /** Завершение проекта — когда ни одна его смена не ждёт набора или проведения. */
+  @Params(ProjectsParams.Complete)
   async complete({ projectId }: z.infer<typeof ProjectsParams.Complete>, ctx: DomainContext) {
     const project = await ProjectsDomain.loadProject(this.collections, projectId)
 
@@ -72,13 +75,7 @@ export class ProjectsDomain {
   // --------------------------------------------- helpers ---------------------------------------------
 
   /** Проект или отказ `notFound` — для других доменов. */
-  static async loadProject(collections: Collections<AppScheme>, projectId: number) {
-    const project = await collections.project.get(projectId)
-
-    if (!project) {
-      throw notFound(`проект ${projectId}`)
-    }
-
-    return project
+  static loadProject(collections: Collections, projectId: number) {
+    return existing(collections.project.get(projectId), `проект ${projectId}`)
   }
 }
